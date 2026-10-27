@@ -1,0 +1,33 @@
+*{box-sizing:border-box}
+:root{font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1d293b;background:#f6f8fc}
+body{width:380px;margin:0}
+header{display:flex;align-items:center;gap:11px;background:#152941;color:white;padding:14px 15px}
+header h1{font-size:15px;line-height:1.2;margin:0}
+header small{display:block;opacity:.8;font-size:11px;margin-top:2px}
+main{padding:12px}
+section{background:#fff;border:1px solid #dde4ee;border-radius:11px;padding:12px;margin-bottom:10px}
+.eyebrow{font-size:11px;font-weight:720;letter-spacing:.035em;color:#56677c;margin-bottom:6px}
+p{margin:4px 0 8px;overflow-wrap:anywhere}
+.page-title{font-size:13px;font-weight:650;color:#172b46}
+.meta,.hint{font-size:11px;color:#5b6b80;overflow-wrap:anywhere}
+.hint{color:#728197;margin-top:7px}
+textarea,input{width:100%;background:#fcfdff;color:inherit;border:1px solid #c8d3e1;border-radius:8px;font:inherit;padding:8px}
+textarea{resize:vertical;min-height:102px;max-height:280px;line-height:1.4}
+input{margin:6px 0 8px}
+.field-label{display:block;margin-top:9px;font-size:11px;color:#4e6178}
+button{border:1px solid #d5dfeb;border-radius:8px;background:#edf2f9;color:#234166;padding:8px 10px;font:inherit;font-weight:650;cursor:pointer}
+button:hover:not(:disabled){background:#dde9f7}
+button.primary{background:#245cba;color:white;border-color:#245cba}
+button.primary:hover:not(:disabled){background:#154a9e}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.wide{width:100%}
+.actions{display:flex;gap:8px;margin-top:8px}
+.actions button{flex:1}
+#site{margin-top:4px}
+#status{padding:9px 10px;background:#eaf0f8;border-radius:8px;color:#254363;min-height:32px;margin:4px 0 10px;font-size:12px}
+details{margin-top:8px;border-top:1px solid #e5ebf2;padding-top:8px}
+summary{cursor:pointer;font-size:11px;font-weight:650;color:#405f84}
+footer{display:flex;justify-content:space-between;gap:8px;align-items:center;color:#63768d;font-size:10px;padding:2px 3px 5px}
+footer a{color:#2b61aa;text-decoration:none}
+footer a:hover{text-decoration:underline}
+button:focus-visible,textarea:focus-visible,input:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #2460bb;outline-offset:2px}

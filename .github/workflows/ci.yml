@@ -1,0 +1,16 @@
+name: Chrome extension checks
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension-zip
+          path: dist/local-tool-bridge-v0.1.0.zip

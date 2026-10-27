@@ -1,0 +1,7 @@
+{
+  "name": "com.eaopen.browser_bridge",
+  "description": "Optional Local Tool Bridge development native host",
+  "path": "/ABSOLUTE/PATH/TO/native-host/reference-host-wrapper",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://REPLACE_WITH_ACTUAL_EXTENSION_ID/"]
+}

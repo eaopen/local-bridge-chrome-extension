@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Local Tool Bridge</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon32.png" width="34" height="34" alt="">
+    <div><h1>Local Tool Bridge</h1><small>Connect this page to your tools</small></div>
+  </header>
+  <main>
+    <section>
+      <div class="eyebrow">CURRENT PAGE</div>
+      <p id="pageTitle" class="page-title">No page captured yet</p>
+      <p id="pageUrl" class="meta"></p>
+      <button id="capture" class="primary wide">Capture selection or page summary</button>
+      <p class="hint">Only this tab, when you click. The shared URL omits query strings and fragments.</p>
+    </section>
+    <section>
+      <label class="eyebrow" for="preview">YOUR CONTENT</label>
+      <textarea id="preview" rows="7" maxlength="16000" spellcheck="false" placeholder="Capture selected text or type/paste a note. Review or edit before sharing."></textarea>
+      <div class="actions"><button id="copy">Copy</button><button id="save">Save .txt</button></div>
+      <p class="hint">The text stays here until you explicitly copy, save or send it.</p>
+    </section>
+    <section>
+      <div class="eyebrow">OPTIONAL LOCAL CONNECTION</div>
+      <div class="actions"><button id="native">Check provider</button><button id="share" class="primary">Send to provider</button></div>
+      <p class="meta" id="providerStatus">No provider checked. The extension works without one.</p>
+      <details>
+        <summary>Provider settings</summary>
+        <label class="field-label" for="hostName">Native Messaging host name</label>
+        <input id="hostName" type="text" maxlength="128" spellcheck="false" autocomplete="off" placeholder="com.eaopen.browser_bridge">
+        <button id="hostSave">Save provider</button>
+        <p class="hint">Choose a host you installed and trust. The native host must explicitly allow this extension's ID. Only this popup can change the host.</p>
+      </details>
+    </section>
+    <section>
+      <div class="eyebrow">WEBSITE INTEGRATION</div>
+      <button id="site" disabled>Allow this site</button>
+      <p id="siteHint" class="hint">A user-approved site can request basic read-only availability, never page content or arbitrary commands.</p>
+    </section>
+    <p id="status" role="status" aria-live="polite">Ready. No data has been sent.</p>
+    <footer>
+      <span>Works independently.</span>
+      <a href="https://github.com/eaopen/local-bridge" target="_blank" rel="noopener noreferrer">Use with Local Bridge (optional)</a>
+    </footer>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
