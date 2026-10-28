@@ -47,7 +47,7 @@ The content script forwards the message only after the site's basic permission; 
 - WorkBuddy/Codex/Pi V2 agent dispatch and business model API use separate scoped authorization and still require additional implementation and real UI/SSO acceptance.
 - The Chrome page API and Native Host V2's `protocol_version=2` are separate from CloudFile's ApplicationProfile V1. Do not reuse the CloudFile production Chrome extension ID or Host.
 
-## WorkBuddy text task (V2 preview)
+## Unified Agent run/read (V2, WorkBuddy currently runnable)
 
 A separately granted Web origin can submit one text-only WorkBuddy task and poll the short-lived event log. This uses a **different per-site Agent grant** from MCP status and a separate OS-user command:
 
@@ -57,7 +57,7 @@ local-bridge web-v2 grant-workbuddy https://your-enterprise-web.example
 local-bridge web-v2 revoke-workbuddy https://your-enterprise-web.example
 ```
 
-Web sends `agent.start` with `{provider:"workbuddy",client_key,prompt}` and receives `status:"accepted",task_id`; only `agent.poll` with `{task_id,cursor}` can retrieve ordered `seq` events, including multiple `message.delta`/`message.final` pairs and a distinct final `task.completed`. Do not interpret a message final as task completion. A lost start response must be retried using the **same** client_key, never a new task key. The user may revoke either site or local grant without affecting Etech or CloudFile V1.
+Web sends `agent.run` with `{api_version:2,client_key,prompt,agent,model,think_mode,agent_mode}` and receives `status:"accepted",task_id`; only `agent.read` with `{task_id,cursor}` can retrieve ordered `seq` events, including multiple `message.delta`/`message.final` pairs and a distinct final `task.completed`. Do not interpret a message final as task completion. A lost start response must be retried using the **same** client_key, never a new task key. The user may revoke either site or local grant without affecting Etech or CloudFile V1.
 
 The WorkBuddy native worker currently targets macOS Desktop 5.9.x / Node 24+ and is **not live tested through corporate Web/Chrome**; absence of WorkBuddy must report unavailable. It launches a separate ACP session using the current logged-in desktop account; file, MCP, shell and tool actions remain disabled.
 
@@ -68,6 +68,17 @@ Chrome is a connection/authentication helper, not the continuous WorkBuddy messa
 
 The Bridge CLI command web-v2 serve binds 127.0.0.1:48293 (never a LAN interface). The page directly uses /v2/capabilities, /v2/workbuddy/tasks, /v2/workbuddy/tasks/{id}/stream?cursor=N (HTTP SSE), /v2/workbuddy/tasks/{id}/events?cursor=N, and /v2/mcp/status. Authentication uses the Authorization Bearer header, never a query-string token. The loopback service checks exact Host, Origin, local user grant and session expiry.
 
-If loopback fetch/SSE is blocked by browser Local Network Access permissions, CORS, or an unavailable daemon, the page falls back to the already implemented short Chrome Native Messaging agent.start/agent.poll, preserving client_key and task_id so WorkBuddy is not submitted twice. Original Etech chat and CloudFile V1 are independent.
+If loopback fetch/SSE is blocked by browser Local Network Access permissions, CORS, or an unavailable daemon, the page falls back to the already implemented short Chrome Native Messaging agent.run/agent.read, preserving client_key and task_id so WorkBuddy is not submitted twice. Original Etech chat and CloudFile V1 are independent.
 
 SSE is the first one-way event channel, supporting multiple assistant messages and explicit terminal states. WebSocket can be added later for interactive tool approval; it must reuse the same task store and authorization, not another agent/task engine. Real Chrome GUI + signed-in WorkBuddy end-to-end acceptance is still pending.
+
+
+## 2026-10-28: Agent V2 interface cleanup and Chrome LNA
+
+- **Only current V2 API**: `agent.run` / `agent.read` on Chrome Native, `runAgent/readAgent` in Web SDK, and `/v2/agents/tasks` on the local HTTP/SSE service. All on-wire run requests require `api_version:2`. Previous unshipped vendor-specific V2 agent start/poll and HTTP task routes have been removed. WorkBuddy still owns its worker and message events internally; Codex/Pi Web adapters are not yet verified.
+- **Selectors**: `agent=auto|workbuddy|codex|pi`, optional `model`, `think_mode=auto|off|low|medium|high|xhigh|max`, `agent_mode=prefer|require`. Bridge selects one real authorized adapter before starting; unsupported explicit model or think mode is rejected rather than silently downgraded. `accepted` is not `completed`.
+- **Local HTTP default**: plain `127.0.0.1:48293` is a normal supported transport. Chrome 142 introduced Local Network Access prompts; Chrome 145 split `loopback-network` and `local-network`. Users may be asked by Chrome to grant loopback permission. With permission, browser mixed-content exceptions allow HTTP local connections in qualifying secure contexts. If blocked, Native Messaging fallback is preserved, including from enterprise HTTP sites that do not qualify as secure contexts.
+- **HTTPS optional**: a user/enterprise may independently deploy an OS/browser-trusted TLS terminator at `https://localhost:48294` or `https://127.0.0.1:48294`, with the proxy preserving Origin and authorization. Bridge itself does **not** create TLS certs, install CAs, bypass browser certificate warnings or require TLS for loopback.
+- Website / OS-user authorization remains explicit and exact-Origin. The local service must reject mismatched Host/Origin and bearer, never expose the port on LAN, and never use wildcard CORS.
+
+References: [Chrome 142](https://developer.chrome.com/release-notes/142), [Chrome 145](https://developer.chrome.com/release-notes/145), [Local Network Access](https://developer.chrome.com/blog/local-network-access).

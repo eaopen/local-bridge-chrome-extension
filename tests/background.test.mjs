@@ -15,18 +15,16 @@ globalThis.chrome={
     async sendNativeMessage(host,request){nativeMessages.push({host,request});return {
       protocol_version:request.protocol_version,request_id:request.request_id,ok:true,
       result: request.action==='host.status'
-        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run','web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.agent.run','web.v2.session.issue']}
+        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run','web.v2.capabilities','web.v2.mcp.status','web.v2.agent.run','web.v2.agent.read','web.v2.session.issue']}
         : request.action==='web.v2.capabilities'
           ? {origin:request.payload.origin,mcp_status_grants:[]}
           : request.action==='web.v2.session.issue'
             ? {endpoint:'http://127.0.0.1:48293',token:'a'.repeat(64),expires_in:600,
                transport:'local-bridge-http-sse-v2'}
            : request.action==='web.v2.agent.run'
-            ? {task_id:'wb-abcde-1234-0',status:'accepted',selected_agent:'workbuddy',
+            ? {api_version:2,task_id:'wb-abcde-1234-0',status:'accepted',selected_agent:'workbuddy',
                selection:'fallback_before_execution',applied_model:null,applied_think_mode:null}
-          : request.action==='web.v2.agent.start'
-            ? {task_id:'wb-abcde-1234-0',status:'accepted',provider:'workbuddy'}
-          : request.action==='web.v2.agent.poll'
+          : request.action==='web.v2.agent.read'
             ? {task_id:request.payload.task_id,status:request.payload.cursor<2?'running':'completed',
               terminal:request.payload.cursor>=2,
               next_seq:request.payload.cursor===0?2:3,has_more:false,
@@ -229,10 +227,11 @@ test('V2 MCP status requires separate exact-site permission and native version 2
   assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,'site_not_allowed');
 });
 
-test('Web WorkBuddy accepts once and returns multiple cursor events, with separate grant',async()=>{
+test('Web unified Agent V2 starts once and returns multiple cursor events',async()=>{
   const req={channel:'local-tool-bridge:web:v2',type:'REQUEST',version:2,
-    requestId:'workbuddy_start',action:'agent.start',
-    params:{provider:'workbuddy',client_key:'client-1',prompt:'Fictional task'}};
+    requestId:'agent_run',action:'agent.run',
+    params:{api_version:2,client_key:'client-1',prompt:'Fictional task',
+      agent:'workbuddy',model:'auto',think_mode:'auto',agent_mode:'require'}};
   nativePermission=true;
   assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup)).ok,true);
   assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,
@@ -240,26 +239,29 @@ test('Web WorkBuddy accepts once and returns multiple cursor events, with separa
   assert.equal((await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},trustedPage)).code,
     'caller_not_allowed');
   assert.equal((await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},popup)).ok,true);
-  const discovery={...req,requestId:'workbuddy_caps',action:'local.capabilities',params:{}};
+  const discovery={...req,requestId:'agent_caps',action:'local.capabilities',params:{}};
   const capabilities=await send({type:'WEB_REQUEST',request:discovery},trustedPage);
   assert.equal(capabilities.ok,true);
   assert.equal(capabilities.result.origin,site);
   const accepted=await send({type:'WEB_REQUEST',request:req},trustedPage);
   assert.equal(accepted.result.status,'accepted');
+  assert.equal(accepted.result.api_version,2);
   assert.equal(nativeMessages.at(-1).request.payload.origin,site);
-  assert.equal(nativeMessages.at(-1).request.action,'web.v2.agent.start');
+  assert.equal(nativeMessages.at(-1).request.payload.api_version,2);
+  assert.equal(nativeMessages.at(-1).request.action,'web.v2.agent.run');
   assert.equal((await send({type:'WEB_REQUEST',request:req},untrustedPage)).code,'site_not_allowed');
-  const poll={...req,requestId:'workbuddy_poll1',action:'agent.poll',
+  const read={...req,requestId:'agent_read1',action:'agent.read',
     params:{task_id:'wb-abcde-1234-0',cursor:0}};
-  const first=await send({type:'WEB_REQUEST',request:poll},trustedPage);
+  const first=await send({type:'WEB_REQUEST',request:read},trustedPage);
   assert.equal(first.result.status,'running');
   assert.deepEqual(first.result.events.map(x=>x.seq),[1,2]);
-  const final=await send({type:'WEB_REQUEST',request:{...poll,requestId:'workbuddy_poll2',
+  assert.equal(nativeMessages.at(-1).request.action,'web.v2.agent.read');
+  const final=await send({type:'WEB_REQUEST',request:{...read,requestId:'agent_read2',
     params:{task_id:'wb-abcde-1234-0',cursor:2}}},trustedPage);
   assert.equal(final.result.status,'completed');
   assert.deepEqual(final.result.events.map(x=>x.seq),[3]);
   assert.equal((await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:false},popup)).ok,true);
-  assert.equal((await send({type:'WEB_REQUEST',request:poll},trustedPage)).code,
+  assert.equal((await send({type:'WEB_REQUEST',request:read},trustedPage)).code,
     'site_agent_permission_required');
 });
 
@@ -284,13 +286,14 @@ test('unified Agent run stays origin-bound and returns Bridge-selected provider'
   await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},popup)
   const request={channel:'local-tool-bridge:web:v2',version:2,type:'REQUEST',
     requestId:'generic-run1',action:'agent.run',params:{
-      client_key:'task-123',prompt:'Synthetic short task',agent:'codex',
+      api_version:2,client_key:'task-123',prompt:'Synthetic short task',agent:'codex',
       model:'auto',think_mode:'auto',agent_mode:'prefer'}}
   const reply=await send({type:'WEB_REQUEST',request},trustedPage)
   assert.equal(reply.ok,true)
   assert.equal(reply.result.selected_agent,'workbuddy')
   assert.equal(nativeMessages.at(-1).request.action,'web.v2.agent.run')
   assert.equal(nativeMessages.at(-1).request.payload.origin,site)
+  assert.equal(nativeMessages.at(-1).request.payload.api_version,2)
   assert.equal(nativeMessages.at(-1).request.payload.agent,'codex')
   assert.equal(nativeMessages.at(-1).request.payload.think_mode,'auto')
   assert.equal((await send({type:'WEB_REQUEST',request},untrustedPage)).code,'site_not_allowed')

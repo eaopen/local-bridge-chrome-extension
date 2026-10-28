@@ -15,6 +15,12 @@
 已安装且授权独立 Native Host 时，可按一下「检查 Provider」并主动「发送给 Provider」。**只 ACK 不等于 AI 任务完成**；用户应在目标程序查看完成状态。
 
 
+## v0.6.2：统一 Agent V2 API，默认本机 HTTP
+
+新版企业 Web SDK 统一使用 `runAgent({apiVersion:2, clientKey, prompt, agent?, model?, thinkMode?, agentMode?})` 和 `readAgent(taskId,cursor,onEvent)`，WorkBuddy/Codex/Pi 使用同一参数合同。开发阶段尚无线上用户，直接删除原 `startWorkbuddy/readWorkbuddy/pollWorkbuddy` 和 `agent.start/poll` V2 入口，避免双轨维护。当前 Web V2 实际能执行的仍是 WorkBuddy 默认文本任务；未实现的 Codex/Pi 或显式模型/ThinkMode 不冒充已可用。
+
+Bridge 本机默认 `http://127.0.0.1:48293`，不默认启用 TLS 或安装证书。Chrome 142/145 的本地网络与 `loopback-network` 权限由浏览器处理，不是服务端 HTTPS 要求。若 HTTP/SSE 被浏览器策略挡住，使用已有 Native Messaging 同任务回退；企业信任的 localhost HTTPS 代理只在必要时自行安装。详见 [Web V2 能力说明](docs/WEB_V2_MCP.md)。
+
 ## v0.5.0：企业 Web 无个人模型配置使用 Pi
 
 企业已有 AI API 时，用户无需申请 Pi 模型 Key。已登录企业 Web 应用通过其后端获取**短期、限范围**的模型票据；用户只需为该网站单独开启一次本地企业 AI 能力，以后企业网页即可使用 **企业同源 AI API → Chrome 插件 → Local Bridge → 本地 Pi → 返回网页** 的受控文本任务。普通仅授权“网站状态发现”的网页仍没有此权限。网页不允许自定义任意外部模型地址、可执行程序或本机文件工具；短期票据不保存在 Chrome 设置中。

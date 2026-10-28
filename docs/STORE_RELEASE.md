@@ -50,3 +50,10 @@ Official policy references:
 - [ ] Validate no browser cookie extraction, no permanent ticket storage, no surprise remote data transfer by extension code; company backend privacy obligations remain its own.
 - [ ] Test a real corporate website's authenticated SSO ticket, available/unavailable local Pi state, correct returned result, site revoke, wrong port/origin, expired token, and unknown result handling on a real Chrome instance.
 - [ ] Update Chrome Store data/permission disclosures and privacy policy to match the real behavior. CI tests alone do not establish Chrome UI/SSO acceptance.
+
+## Unified Agent V2 / Chrome 142+ LNA
+
+- [ ] Check exact-origin enterprise Agent grant and `api_version=2` for every `agent.run` call; direct HTTP and Native fallback use the same `clientKey`, task ID and cursor.
+- [ ] On Chrome 142+ and 145+, verify the browser loopback permission prompt (distinct from TLS), default `http://127.0.0.1:48293` in a trusted secure webpage and fallback to Native when LNA is unavailable.
+- [ ] Do not create trust certificates or require HTTPS by default for loopback; any optional trusted HTTPS proxy is explicitly user/enterprise installed and must have a valid local SAN.
+- [ ] Prove `agent.read` can handle multiple messages and separate actual task terminal status. Codex/Pi are selectors until corresponding approved runtime adapters are validated.

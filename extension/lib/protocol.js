@@ -141,16 +141,10 @@ export function validWebV2Request(message) {
       /^[a-zA-Z0-9._-]{1,64}$/.test(p.provider) &&
       /^(?:status|[a-zA-Z0-9._-]{1,56}_status)$/.test(p.tool);
   }
-  if (message.action === 'agent.start') {
-    return p && typeof p === 'object' && !Array.isArray(p) &&
-      Object.keys(p).length === 3 && p.provider === 'workbuddy' &&
-      typeof p.client_key === 'string' && /^[A-Za-z0-9_.-]{1,80}$/.test(p.client_key) &&
-      typeof p.prompt === 'string' && p.prompt.trim().length > 0 &&
-      new TextEncoder().encode(p.prompt).length <= 12000;
-  }
   if (message.action === 'agent.run') {
     return p && typeof p === 'object' && !Array.isArray(p) &&
-      Object.keys(p).length === 6 &&
+      Object.keys(p).length === 7 &&
+      p.api_version === 2 &&
       /^[A-Za-z0-9_.-]{1,80}$/.test(p.client_key || '') &&
       typeof p.prompt === 'string' && Boolean(p.prompt.trim()) &&
       new TextEncoder().encode(p.prompt).length <= 12000 &&
@@ -161,16 +155,16 @@ export function validWebV2Request(message) {
       ['prefer','require'].includes(p.agent_mode) &&
       !(p.agent === 'auto' && p.agent_mode === 'require');
   }
-  if (message.action === 'agent.poll') {
+  if (message.action === 'agent.read') {
     return p && typeof p === 'object' && !Array.isArray(p) &&
       Object.keys(p).length === 2 &&
-      typeof p.task_id === 'string' && /^wb-[a-f0-9-]{1,92}$/.test(p.task_id) &&
+      typeof p.task_id === 'string' && /^(?:wb|codex|pi)-[a-z0-9-]{1,92}$/.test(p.task_id) &&
       Number.isSafeInteger(p.cursor) && p.cursor >= 0 && p.cursor <= 100000;
   }
   return false;
 }
 export function nativeV2Request(action, payload, id) {
-  if (!validRequestId(id) || !['web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.agent.run','web.v2.session.issue'].includes(action) ||
+  if (!validRequestId(id) || !['web.v2.capabilities','web.v2.mcp.status','web.v2.agent.run','web.v2.agent.read','web.v2.session.issue'].includes(action) ||
       !payload || typeof payload !== 'object' || Array.isArray(payload))
     throw new Error('Invalid V2 request');
   if (!validatedOrigin(payload.origin + '/')) throw new Error('Invalid V2 origin');
@@ -181,20 +175,16 @@ export function nativeV2Request(action, payload, id) {
     channel:WEB_V2_CHANNEL,type:'REQUEST',version:2,requestId:id,
     action:'mcp.status',params:{provider:payload.provider,tool:payload.tool}
   })) throw new Error('Unsupported V2 MCP request');
-  const v2Agent = action === 'web.v2.agent.start' ? 'agent.start'
-    : action === 'web.v2.agent.poll' ? 'agent.poll'
-    : action === 'web.v2.agent.run' ? 'agent.run' : null;
+  const v2Agent = action === 'web.v2.agent.run' ? 'agent.run'
+    : action === 'web.v2.agent.read' ? 'agent.read' : null;
   if (v2Agent && (!validWebV2Request({
     channel:WEB_V2_CHANNEL,type:'REQUEST',version:2,requestId:id,
-    action:v2Agent,params:v2Agent === 'agent.start'
-      ? {provider:payload.provider,client_key:payload.client_key,prompt:payload.prompt}
-      : v2Agent === 'agent.run'
-        ? {client_key:payload.client_key,prompt:payload.prompt,
-           agent:payload.agent,model:payload.model,
-           think_mode:payload.think_mode,agent_mode:payload.agent_mode}
-        : {task_id:payload.task_id,cursor:payload.cursor}
-  }) || Object.keys(payload).length !== (v2Agent === 'agent.start' ? 4 :
-      v2Agent === 'agent.run' ? 7 : 3))) {
+    action:v2Agent,params:v2Agent === 'agent.run'
+      ? {api_version:payload.api_version,client_key:payload.client_key,prompt:payload.prompt,
+         agent:payload.agent,model:payload.model,
+         think_mode:payload.think_mode,agent_mode:payload.agent_mode}
+      : {task_id:payload.task_id,cursor:payload.cursor}
+  }) || Object.keys(payload).length !== (v2Agent === 'agent.run' ? 8 : 3))) {
     throw new Error('Unsupported V2 Agent request');
   }
   return {protocol_version:2,request_id:id,action,payload};
