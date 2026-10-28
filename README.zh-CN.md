@@ -15,6 +15,12 @@
 已安装且授权独立 Native Host 时，可按一下「检查 Provider」并主动「发送给 Provider」。**只 ACK 不等于 AI 任务完成**；用户应在目标程序查看完成状态。
 
 
+## v0.5.0：企业 Web 无个人模型配置使用 Pi
+
+企业已有 AI API 时，用户无需申请 Pi 模型 Key。已登录企业 Web 应用通过其后端获取**短期、限范围**的模型票据；用户只需为该网站单独开启一次本地企业 AI 能力，以后企业网页即可使用 **企业同源 AI API → Chrome 插件 → Local Bridge → 本地 Pi → 返回网页** 的受控文本任务。普通仅授权“网站状态发现”的网页仍没有此权限。网页不允许自定义任意外部模型地址、可执行程序或本机文件工具；短期票据不保存在 Chrome 设置中。
+
+此功能需要企业服务方接入已定义的兼容 API 和票据合同，目前代码/模拟执行可用，**尚未完成真实企业登录与 Chrome GUI 全链路验收**。无需 Local Bridge 时原有网页采集、复制、Web AI 手动接力不受影响。详见 [企业 Web → Pi 接入合同](docs/ENTERPRISE_PI_WEB.md)。
+
 ## v0.4.0：手动 Web AI 接力（不是 9Router）
 
 当 Codex 等本地工具额度耗尽或暂时不可用时，可在当前 Popup 选择 ChatGPT/Gemini/Claude/Copilot/DeepSeek 或自定义 HTTPS 聊天网站，点击 **Copy task & open Web AI**，由用户自己粘贴提示词、继续聊天。完成后选择或粘贴一段 AI 回复，可以 **Copy return package** 给任意工具；可选安装 Local Bridge 时，还能调用 `relay.return` 把结果及原任务引用存入已有本地收件箱。
@@ -43,6 +49,6 @@ npm run build
 # Chrome -> chrome://extensions -> 开发者模式 -> 加载已解压的扩展 -> extension/
 ```
 
-Node 20+ 只在测试/构建时需要；插件无运行时 npm 依赖。商店包为 `dist/local-tool-bridge-v0.4.0.zip`。正式上架还需要发布者验证、固定扩展 ID、真实 Chrome/系统验证、截图、HTTPS 隐私政策与 Chrome Web Store 审核；**仓库代码通过测试不意味着已经上架**。
+Node 20+ 只在测试/构建时需要；插件无运行时 npm 依赖。商店包为 `dist/local-tool-bridge-v0.5.0.zip`。正式上架还需要发布者验证、固定扩展 ID、真实 Chrome/系统验证、截图、HTTPS 隐私政策与 Chrome Web Store 审核；**仓库代码通过测试不意味着已经上架**。
 
 [Chrome Web Store 准备清单](docs/STORE_RELEASE.md) · [开发约束 AGENTS.md](AGENTS.md)

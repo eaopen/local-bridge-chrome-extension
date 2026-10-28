@@ -53,3 +53,27 @@ Further capabilities require explicit version/capability negotiation, source tru
 ## Optional manual Web AI Relay
 
 An optional host may advertise `relay.return`. The extension's popup, **never a website**, sends a bounded `{relay_id,task_ref,web_ai,source:{title,url},reply:{title,url,selection}}` object when the user explicitly clicks Return to local provider. The Local Bridge implementation stores it under its existing user-owned inbox and reports `received/stored` rather than `completed`. It does not process it with a model, apply patches, or call an MCP tool. Web chat prompting is a separate user-controlled clipboard operation, **not** an API action on the Native Host. See [manual Web AI Relay](WEB_AI_RELAY.md).
+
+## New optional `enterprise.pi.run` (trusted site only)
+
+This is a *separate user-approved per-origin capability*, not a generic Agent/MCP tool for every website. The already-authenticated enterprise Web page first obtains a short-lived scoped model ticket **from its own backend**, then sends through the existing approved `window.postMessage` Web API:
+
+```json
+{
+  "channel":"local-tool-bridge:web:v1",
+  "type":"REQUEST",
+  "version":1,
+  "requestId":"enterprise-task-123",
+  "action":"enterprise.pi.run",
+  "params":{
+    "api_path":"/api/local-ai/v1",
+    "model":"team-chat",
+    "ticket":"<short-lived-ticket-from-the-logged-in-enterprise-backend>",
+    "prompt":"Analyze this user-approved fictional task"
+  }
+}
+```
+
+The Chrome Service Worker supplies `origin` from **Chrome's actual sender**, not page data, enforces separate local-AI permission and nativeMessaging authorization, and limits the operation to a text-only model request. The Native Host validates the same-origin HTTPS path (loopback HTTP allowed only for development), checks endpoint and token scope by calling the enterprise backend, and returns `ok:true,result:{status:"completed",agent:"pi",model_source:"enterprise_session",result:"..."}` only after confirmed execution. No shell, filesystem, browser Cookie or externally chosen model URL is forwarded. The ticket is never echoed in a result. Without a trusted app backend, return a genuine error; do not silently fall back to other models.
+
+The business application keeps its own `requestId`/object reference; Bridge does not create another enterprise account or replace an existing business authorization system. The user must separately enable this origin's **enterprise AI** button after granting basic site read-only access. Testing with mock Native Host is not a claim that real enterprise SSO integration is finished.

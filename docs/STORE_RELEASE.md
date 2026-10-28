@@ -26,7 +26,7 @@ No `tabs`, `history`, `cookies`, `webRequest`, `downloads`, `debugger`, broad re
 - [ ] Host accurate privacy policy via HTTPS and complete User Data/Privacy Practices declaration; describe what happens when page content is explicitly forwarded to a selected local third-party tool.
 - [ ] Supply truthful listing title, short/long descriptions, developer contact, 128x128 icon, screenshots from the *real running extension*, and store promotional assets if required in the selected listing category.
 - [ ] Chrome Web Store account and developer verification completed, including any required 2-step verification; review current store policies at submission time.
-- [ ] Run `npm run build` (Node 20+, no dependencies). Upload only `dist/local-tool-bridge-v0.4.0.zip`; source/native development fixtures excluded.
+- [ ] Run `npm run build` (Node 20+, no dependencies). Upload only `dist/local-tool-bridge-v0.5.0.zip`; source/native development fixtures excluded.
 - [ ] Test that user-approved HTTP internal sites work without treating Profile JSON or web page as trusted code.
 - [ ] Verify no external scripts, telemetry, analytics, automated chat scraping, permission surprises or broken UI; public screenshots match current version.
 
@@ -42,3 +42,11 @@ Official policy references:
 - [ ] Show truthful privacy disclosures for one pending handoff descriptor (relay ID, task ref, service, time and cleaned source title/URL) in `storage.local`, and explicit optional delivery of reviewed reply to a separately installed local host.
 - [ ] Verify return-copy works with no Native Host and `relay.return` is only exposed to the extension popup, not website scripts.
 - [ ] Confirm user-selected external site may process content under its own privacy/usage policies. The extension does not replace model gateways, manage quotas or collect AI service credentials.
+
+## Enterprise Web → Pi permission review (v0.5)
+
+- [ ] Explain clearly that enterprise AI is a **separate** privilege beyond read-only website discovery, requires a user opt-in once per exact origin and can invoke model inference without further popup clicks.
+- [ ] Confirm Web page cannot choose arbitrary native executables, local tools, filesystem paths or cross-origin model URLs; corporate app backend must issue a short-lived, scope-limited ticket and verify it on every request.
+- [ ] Validate no browser cookie extraction, no permanent ticket storage, no surprise remote data transfer by extension code; company backend privacy obligations remain its own.
+- [ ] Test a real corporate website's authenticated SSO ticket, available/unavailable local Pi state, correct returned result, site revoke, wrong port/origin, expired token, and unknown result handling on a real Chrome instance.
+- [ ] Update Chrome Store data/permission disclosures and privacy policy to match the real behavior. CI tests alone do not establish Chrome UI/SSO acceptance.

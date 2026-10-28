@@ -19,3 +19,7 @@ The extension exists to connect the user's **browser context and deliberately pe
 Long-lived bidirectional Native Host requests would need a reviewed `connectNative()` protocol with task correlation and explicit per-capability restrictions; v0.2 currently uses only user-initiated `sendNativeMessage()` calls. A future provider-independent local host must not accept arbitrary shell, executable paths, webpage-supplied identity claims or unchecked commands.
 
 Principle: **browser extension supplies browser capabilities; Local Bridge supplies local task coordination; CloudFile supplies file operations.** Together useful; independently usable.
+
+## Enterprise AI: additional scoped website permission (v0.5)
+
+`browser.site.enterprise.pi.run` is implemented as a separately user-enabled exact-origin capability, not as an automatic expansion of read-only site discovery. The enterprise backend provides a scoped short-lived ticket, its own model ID and a same-origin compatible API path. Bridge's Native Host runs a bounded Pi text-only task and returns genuine completion to the source Web application; no user Pi model account, arbitrary shell, local file tools, or separate model gateway. Real corporate SSO and Chrome UI acceptance remain pending.

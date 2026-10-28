@@ -8,10 +8,21 @@ import { relayReturnPayload } from './lib/web-ai-relay.js';
 const SCRIPT_ID = 'local-tool-bridge-user-sites-v1';
 const MAX_SITES = 32;
 const nativeStatusLast = new Map(); // soft resource limit for an approved web page
+const enterpriseLast = new Map();
+const enterpriseActive = new Set();
 
 async function sites() {
   const result = await chrome.storage.local.get('trustedSites');
   return Array.isArray(result.trustedSites) ? result.trustedSites : [];
+}
+
+async function aiSites() {
+  const r = await chrome.storage.local.get('enterpriseAiSites');
+  return Array.isArray(r.enterpriseAiSites) ? r.enterpriseAiSites : [];
+}
+
+async function allowAiSite(origin) {
+  return (await aiSites()).includes(origin) && await allowSite(origin);
 }
 
 async function allowSite(origin) {
@@ -90,6 +101,42 @@ async function onMessage(message, sender) {
         return { ok: true, result: { protocol_version: VERSION,
           extension_version: chrome.runtime.getManifest().version,
           native_host: 'optional' } };
+      case 'enterprise.pi.run': {
+        if (!await allowAiSite(origin)) return {ok:false,code:'site_ai_permission_required'};
+        if (!await chrome.permissions.contains({permissions:['nativeMessaging']})) {
+          return {ok:false,code:'native_permission_required'};
+        }
+        const key = `${origin}:${sender.tab.id}`;
+        const now = Date.now();
+        if (enterpriseActive.has(key) || now - (enterpriseLast.get(key) || 0) < 3000) {
+          return {ok:false,code:'rate_limited'};
+        }
+        enterpriseLast.set(key,now);
+        const status = publicHostStatus(await sendNative('host.status'));
+        if (!status.ok) return status;
+        if (!status.result.capabilities.includes('enterprise.pi.run')) {
+          return {ok:false,code:'enterprise_pi_not_supported'};
+        }
+        const p=message.request.params;
+        enterpriseActive.add(key);
+        try {
+          // origin comes ONLY from Chrome sender, never a page-supplied string.
+          const reply=await sendNative('enterprise.pi.run',{
+            origin,api_path:p.api_path,model:p.model,ticket:p.ticket,prompt:p.prompt
+          });
+          if (!reply.ok) return reply;
+          if (reply.result?.status!=='completed' ||
+              typeof reply.result.result!=='string') {
+            return {ok:false,code:'enterprise_pi_incomplete'};
+          }
+          // Return only model output and status to the exact requesting origin;
+          // never echo bearer or web-provided credentials.
+          return {ok:true,result:{
+            status:'completed',agent:'pi',model_source:'enterprise_session',
+            result:reply.result.result
+          }};
+        } finally {enterpriseActive.delete(key);}
+      }
       case 'native.status': {
         if (!await chrome.permissions.contains({ permissions: ['nativeMessaging'] })) {
           return { ok: false, code: 'native_permission_required' };
@@ -115,12 +162,38 @@ async function onMessage(message, sender) {
       return { ok: false, code: 'host_permission_required' };
     }
     await chrome.storage.local.set({ trustedSites: next });
+    if (!message.enabled) {
+      await chrome.storage.local.set({
+        enterpriseAiSites: (await aiSites()).filter(x => x !== origin)
+      });
+    }
     await refreshContentScripts();
     return { ok: true, enabled: message.enabled, count: next.length };
   }
+  if (message.type === 'SITE_AI_TOGGLE') {
+    const origin = validatedOrigin(`${message.origin || ''}/`);
+    if (!origin) return {ok:false,code:'invalid_origin'};
+    if (message.enabled && !await allowSite(origin)) {
+      return {ok:false,code:'site_permission_required'};
+    }
+    if (message.enabled && !await chrome.permissions.contains({permissions:['nativeMessaging']})) {
+      return {ok:false,code:'native_permission_required'};
+    }
+    const previous = await aiSites();
+    const next = message.enabled
+      ? [...new Set([...previous,origin])]
+      : previous.filter(x=>x!==origin);
+    if (next.length>MAX_SITES) return {ok:false,code:'site_limit'};
+    await chrome.storage.local.set({enterpriseAiSites:next});
+    return {ok:true,enabled:message.enabled};
+  }
   if (message.type === 'GET_SITE') {
     const origin = validatedOrigin(`${message.origin || ''}/`);
-    return { ok: true, allowed: Boolean(origin && await allowSite(origin)) };
+    return {
+      ok:true,
+      allowed:Boolean(origin && await allowSite(origin)),
+      ai_enabled:Boolean(origin && await allowAiSite(origin))
+    };
   }
   if (message.type === 'HOST_GET') {
     const saved = await chrome.storage.local.get('nativeHost');

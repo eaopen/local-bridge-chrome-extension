@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 const site='https://example.test';
 const listeners={};const granted=new Set([`${site}/*`]);
-let stored=[];let selectedNativeHost=null;let nativePermission=false;let nativeMessages=[];let registered=[];
+let stored=[];let aiSitesStored=[];let selectedNativeHost=null;let nativePermission=false;let nativeMessages=[];let registered=[];
 const id='chrome-test-extension';
 const popupUrl=`chrome-extension://${id}/popup.html`;
 globalThis.chrome={
@@ -15,14 +15,23 @@ globalThis.chrome={
     async sendNativeMessage(host,request){nativeMessages.push({host,request});return {
       protocol_version:1,request_id:request.request_id,ok:true,
       result: request.action==='host.status'
-        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return']}
+        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run']}
         : request.action==='context.summarize'
           ? {status:'completed',summary:'A brief summary.'}
+          : request.action==='enterprise.pi.run'
+            ? {status:'completed',result:'MOCK_ENTERPRISE_OK'}
           : request.action==='relay.return'
             ? {stored:true,status:'received',task_id:'ctx-returned12345'}
             : {received:true,forwarded:false}};}
   },
-  storage:{local:{async get(){return {trustedSites:stored,nativeHost:selectedNativeHost};},async set(x){if ('trustedSites' in x) stored=x.trustedSites;if ('nativeHost' in x) selectedNativeHost=x.nativeHost;}}},
+  storage:{local:{
+    async get(){return {trustedSites:stored,enterpriseAiSites:aiSitesStored,nativeHost:selectedNativeHost};},
+    async set(x){
+      if ('trustedSites' in x) stored=x.trustedSites;
+      if ('enterpriseAiSites' in x) aiSitesStored=x.enterpriseAiSites;
+      if ('nativeHost' in x) selectedNativeHost=x.nativeHost;
+    }
+  }},
   permissions:{async contains(q){return q.permissions ? nativePermission : granted.has(q.origins[0]);},
     onRemoved:{addListener(fn){listeners.permissionRemoved=fn;}}},
   scripting:{async getRegisteredContentScripts(){return registered;},
@@ -129,4 +138,43 @@ test('user-reviewed Web AI return is popup-only and retains task reference',asyn
   assert.equal(wire.reply.selection,'Proposed fix; not executed.');
   assert.equal((await send({type:'RELAY_RETURN',pending,reply},trustedPage)).code,'caller_not_allowed');
   assert.equal((await send({type:'RELAY_RETURN',pending,reply:{...reply,selection:' '}},popup)).code,'invalid_relay');
+});
+
+test('enterprise Pi requires separate local AI grant, original signed ticket and exact Chrome origin',async()=>{
+  const req={
+    channel:'local-tool-bridge:web:v1',type:'REQUEST',version:1,
+    requestId:'enterprise_1',action:'enterprise.pi.run',
+    params:{
+      api_path:'/api/local-ai/v1',model:'team-chat',
+      ticket:'test-short-lived-ticket',prompt:'Summarize a synthetic project note'
+    }
+  };
+  nativePermission=true;
+  assert.equal((await send({type:'SITE_AI_TOGGLE',origin:site,enabled:true},popup)).code,
+    'site_permission_required');
+  assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup)).ok,true);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,
+    'site_ai_permission_required');
+  assert.equal((await send({type:'SITE_AI_TOGGLE',origin:site,enabled:true},trustedPage)).code,
+    'caller_not_allowed');
+  assert.equal((await send({type:'SITE_AI_TOGGLE',origin:site,enabled:true},popup)).ok,true);
+  assert.equal((await send({type:'GET_SITE',origin:site},popup)).ai_enabled,true);
+  const result=await send({type:'WEB_REQUEST',request:req},trustedPage);
+  assert.equal(result.ok,true);
+  assert.equal(result.result.status,'completed');
+  assert.equal(result.result.result,'MOCK_ENTERPRISE_OK');
+  assert.ok(!JSON.stringify(result).includes('test-short-lived-ticket'));
+  assert.equal(nativeMessages.at(-1).request.action,'enterprise.pi.run');
+  assert.equal(nativeMessages.at(-1).request.payload.origin,site);
+  assert.equal(nativeMessages.at(-1).request.payload.api_path,'/api/local-ai/v1');
+  assert.equal(nativeMessages.at(-1).request.payload.ticket,'test-short-lived-ticket');
+  assert.equal((await send({type:'WEB_REQUEST',request:req},untrustedPage)).code,
+    'site_not_allowed');
+  assert.equal((await send({type:'WEB_REQUEST',request:req},{...trustedPage,frameId:1})).code,
+    'site_not_allowed');
+  assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,
+    'rate_limited');
+  assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:false},popup)).ok,true);
+  assert.equal((await send({type:'GET_SITE',origin:site},popup)).ai_enabled,false);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,'site_not_allowed');
 });
