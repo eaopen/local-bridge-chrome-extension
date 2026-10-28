@@ -1,3 +1,10 @@
+## v0.3.0 — optional user-click AI summaries (code, not Store approval)
+
+- Add `context.summarize` as an **optional** V1 Native Messaging capability, only callable by the extension popup. User reviews selected/edited text and clicks a dedicated button.
+- Show real completed local-provider summaries in the popup with a Copy action; unavailable/no-host cases preserve existing Copy/Save.
+- Keep approved website API read-only; no automatic model calls, browser cookies, broad host permissions, extra required dependencies or CloudFile host takeover.
+- Clarify that a locally installed provider may call a remote model. Real Chrome/host/AI sign-in verification remains pending.
+
 # Changelog
 
 ## 0.2.0 — unified independent extension

@@ -40,6 +40,12 @@ Response:
 
 Other V1 action: `context.share`, with bounded UTF-8 string payload `title`, `url`, `selection` only. The `selection` value can be user-edited text, a chosen page summary, or an explicitly typed note. **Only popup** can send this action, after explicit preview and a click. It never exposes to a Web page. The reference host returns `received:true, forwarded:false` without storing/forwarding, demonstrating a protocol test but **not** a real agent task.
 
+### Optional V1 `context.summarize` capability
+
+Native hosts that explicitly advertise `context.summarize` in `host.status.result.capabilities` may accept the same bounded, user-reviewed `{title,url,selection}` payload **only from the extension's own popup**. This is an additive, capability-gated action, not a general-purpose `agent.run` or arbitrary prompt API. Approved websites retain *only* `extension.status` and `native.status`; they can never start this action.
+
+A successful response reports `{status:"completed",summary:"..."}` only when the selected host has received a real completed result; unavailable/failed/incomplete agent runs return `ok:false`. A host is not required to support this action. The Local Bridge provider uses the user's existing authenticated Codex CLI; other trusted providers can implement their own backend. Selected content can reach the provider's configured model service, which may be network based. The extension does not start AI automatically, upload to an extension-owned server, or persist the result in a second conversation database. The popup must remain open until the response arrives.
+
 Do not reuse CloudFile's production Native Host name or Chrome extension ID. The separately developed Local Bridge can later ship its own host implementation with the same framed V1 contract, or provide an explicitly registered alternative. Store listing should not claim a host is built-in or automatically installed.
 
-Future capabilities require deliberate schema revision, source trust and tests. No generic `{command, argv, path}` request; no unbounded pass-through to arbitrary host processes. Extension and host own their own versions and upgrades.
+Further capabilities require explicit version/capability negotiation, source trust and tests. Unknown actions must be rejected; this V1 addition is only `context.summarize` when advertised by the host. No generic `{command, argv, path}` request; no unbounded pass-through to arbitrary host processes. Extension and host own their own versions and upgrades.

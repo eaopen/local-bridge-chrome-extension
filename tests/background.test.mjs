@@ -13,7 +13,12 @@ globalThis.chrome={
     onInstalled:{addListener(fn){listeners.installed=fn;}},
     onStartup:{addListener(fn){listeners.startup=fn;}},
     async sendNativeMessage(host,request){nativeMessages.push({host,request});return {
-      protocol_version:1,request_id:request.request_id,ok:true,result:{provider:'reference-host'}};}
+      protocol_version:1,request_id:request.request_id,ok:true,
+      result: request.action==='host.status'
+        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize']}
+        : request.action==='context.summarize'
+          ? {status:'completed',summary:'A brief summary.'}
+          : {received:true,forwarded:false}};}
   },
   storage:{local:{async get(){return {trustedSites:stored,nativeHost:selectedNativeHost};},async set(x){if ('trustedSites' in x) stored=x.trustedSites;if ('nativeHost' in x) selectedNativeHost=x.nativeHost;}}},
   permissions:{async contains(q){return q.permissions ? nativePermission : granted.has(q.origins[0]);},
@@ -31,6 +36,7 @@ const untrustedPage={...trustedPage,origin:'https://evil.test',url:'https://evil
 test('website cannot activate itself or share content',async()=>{
   assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:true},trustedPage)).code,'caller_not_allowed');
   assert.equal((await send({type:'SHARE_CONTEXT',context:{title:'x',url:'a',selection:'s'}},trustedPage)).code,'caller_not_allowed');
+  assert.equal((await send({type:'SUMMARIZE_CONTEXT',context:{title:'x',url:'a',selection:'s'}},trustedPage)).code,'caller_not_allowed');
 });
 test('popup permission enables EXACT origin, refuses other origin/frame',async()=>{
   const r=await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup);
@@ -83,4 +89,17 @@ test('editable preview values are sanitized before sending to native provider', 
   assert.equal(payload.url,'https://example.test/item');
   assert.equal(payload.title,'Edited draft');
   assert.equal((await send({type:'SHARE_CONTEXT',context:{...input,selection:'  '}},popup)).code,'invalid_context');
+});
+
+test('only popup can explicitly summarize, via capability-checked native host',async()=>{
+  nativePermission=true;
+  const ctx={title:'Note',url:'https://example.test/notes',selection:'Summarize this user-selected text.'};
+  const result=await send({type:'SUMMARIZE_CONTEXT',context:ctx},popup);
+  assert.equal(result.ok,true);
+  assert.equal(result.result.status,'completed');
+  assert.equal(result.result.summary,'A brief summary.');
+  assert.equal(nativeMessages.at(-2).request.action,'host.status');
+  assert.equal(nativeMessages.at(-1).request.action,'context.summarize');
+  assert.equal((await send({type:'SUMMARIZE_CONTEXT',context:ctx},trustedPage)).code,'caller_not_allowed');
+  assert.equal((await send({type:'SUMMARIZE_CONTEXT',context:{...ctx,selection:' '}},popup)).code,'invalid_context');
 });

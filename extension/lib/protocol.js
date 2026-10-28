@@ -67,9 +67,9 @@ export function formatContext(context) {
 
 export function nativeRequest(action, payload = {}, requestId) {
   if (!validRequestId(requestId)) throw new Error('Invalid request id');
-  if (!['host.status', 'context.share'].includes(action)) throw new Error('Unsupported native action');
+  if (!['host.status', 'context.share', 'context.summarize'].includes(action)) throw new Error('Unsupported native action');
   if (!payload || Array.isArray(payload) || typeof payload !== 'object') throw new Error('Invalid payload');
-  if (action === 'context.share') {
+  if (action === 'context.share' || action === 'context.summarize') {
     const s = JSON.stringify(payload);
     if (new TextEncoder().encode(s).length > MAX_SHARE_BYTES) throw new Error('Share too large');
   } else if (Object.keys(payload).length) {

@@ -8,6 +8,7 @@ Local Tool Bridge is **provider-neutral**. `com.eaopen.browser_bridge` is the de
 - Host manifest pins one or more **actual, installed** Chrome extension IDs in `allowed_origins`; wildcard extension IDs are forbidden.
 - `host.status` → confirms real provider name and supported capability IDs (status only, no claims of AI/CloudFile completion).
 - `context.share` → receives a **user-edited** `{title,url,selection}` object. A positive reply means only what `result` explicitly states: `received`, `forwarded` or an actual task ref. Do not claim full processing from an ACK.
+- Optional `context.summarize` → **only if** `host.status.result.capabilities` advertises it. The user explicitly clicks in the popup. Provider chooses its own model/login; host returns `status:completed` with a string `summary` only after actual completion, otherwise `ok:false`. No arbitrary executable or raw model prompt is taken from websites. The provider/model may communicate with external services; document that truthfully.
 - Correlate `protocol_version:1` and `request_id`, reject unknown actions/oversized payloads and validate the real Chrome caller.
 - No arbitrary shell commands, EXE paths, backend tokens, browser cookies or automatic background uploading.
 

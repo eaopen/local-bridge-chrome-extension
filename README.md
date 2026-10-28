@@ -6,6 +6,12 @@
 
 **Single purpose:** explicitly transfer user-reviewed context from the current page to user-chosen local tools. No passive browsing capture, remote scripts, analytics, cookie access, browser identity management, or general-purpose command execution.
 
+## v0.3.0 — optional one-click local AI summary
+
+A user can now click **Summarize with local AI** on the content they selected/edited in the extension popup. The action is advertised only by compatible Native Messaging hosts (`context.summarize` capability); the Local Bridge implementation invokes the user's **existing Codex CLI** in ephemeral read-only mode and returns a summary to the popup. No host, no Codex or unsupported provider? Capture, edit, Copy and Save continue to work.
+
+**This is a deliberate user action, not a website or background AI API.** The user must keep the popup open while it runs. The chosen provider/model may process text using a remote service; users should review content before invoking it. Neither the extension nor Local Bridge adds its own cloud model account. Actual Chrome plus logged-in Codex end-to-end remains to be verified on Windows/macOS.
+
 ## v0.2.0 — merged from two v0.1.0 prototypes
 
 | Feature | Works with no native host? | Details |
@@ -14,6 +20,7 @@
 | Edit, copy, export `.txt` | Yes | Review or change text before local Copy/Save/Send |
 | Website read-only presence API | Yes | User enables individual sites; only `extension.status` and optional `native.status` |
 | Native provider status / handoff | Optional | `host.status` and `context.share`, request ID correlation, framed Chrome Native Messaging |
+| Summarize reviewed text in popup | Optional | Extra `context.summarize` capability; only user click, requires provider with installed/authorized AI CLI |
 | Custom provider selection | Optional | User locally configures an installed host name in the popup; no website can change it |
 | Local Bridge onboarding | Yes | Optional official project link, standard host contract; no forced installation |
 | CloudFile local editing | Not yet | Current CloudFile extension remains production path; future migration requires actual file-mode E2E |
@@ -28,7 +35,7 @@ npm run build
 # Chrome → chrome://extensions → Developer mode → Load unpacked → choose extension/
 ```
 
-The plugin itself has **no runtime npm dependencies**. Node 20+ is only needed to run tests and create the reproducible store ZIP; `npm run build` produces `dist/local-tool-bridge-v0.2.0.zip` containing only deployable extension assets.
+The plugin itself has **no runtime npm dependencies**. Node 20+ is only needed to run tests and create the reproducible store ZIP; `npm run build` produces `dist/local-tool-bridge-v0.3.0.zip` containing only deployable extension assets.
 
 ### Without a provider
 
@@ -38,9 +45,9 @@ Select any text on an ordinary HTTP(S) page, click the extension icon → **Capt
 
 1. Install an independent Chrome Native Messaging host that implements [Provider V1](docs/PROTOCOL_V1.md).
 2. The host installer must register the host for your OS user, pin **this extension's actual published ID** in `allowed_origins`, and validate the protocol. The default host is `com.eaopen.browser_bridge`. Advanced users can explicitly select another valid installed host name in the popup.
-3. On the popup, click **Check provider** (Chrome requests nativeMessaging permission only then); review your content, then **Send to provider**. A reference host that only acknowledges receipt does **not** constitute successful local AI or CloudFile processing.
+3. In the popup, review your content and click **Send to provider**. Click **Summarize with local AI** only if you want the selected provider to process that text (Chrome asks for optional nativeMessaging permission as needed). The extension checks that the host advertises `context.summarize` before sending the request. A reference host that only acknowledges receipt does **not** constitute successful local AI or CloudFile processing.
 
-This v0.2.0 extension does **not** ship or register a production native host. Local Bridge integration is tracked independently at [Local Bridge #9](https://github.com/eaopen/local-bridge/issues/9). The extension does not need Local Bridge for its independent page-note features.
+This v0.3.0 extension does **not** ship or register a native host. Local Bridge independently implements `com.eaopen.browser_bridge` with user-level installation and the optional summary capability, but a separately installed third-party host can implement the same typed action. Integration is tracked at [Local Bridge #9](https://github.com/eaopen/local-bridge/issues/9). The extension does not need Local Bridge for its independent page-note features.
 
 ## Existing CloudFile users
 
@@ -56,4 +63,4 @@ No change is made to the current [CloudFile Chrome Extension](https://github.com
 
 See [privacy policy draft](docs/PRIVACY_POLICY.md), [store release checklist](docs/STORE_RELEASE.md), [security](docs/SECURITY.md), and [development instructions](docs/DEVELOPMENT.md).
 
-Apache-2.0. **No claim that v0.2.0 is approved/published in Chrome Web Store.**
+Apache-2.0. **No claim that v0.3.0 is approved/published in Chrome Web Store.**
