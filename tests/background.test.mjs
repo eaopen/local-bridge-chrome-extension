@@ -15,9 +15,12 @@ globalThis.chrome={
     async sendNativeMessage(host,request){nativeMessages.push({host,request});return {
       protocol_version:request.protocol_version,request_id:request.request_id,ok:true,
       result: request.action==='host.status'
-        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run','web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll']}
+        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run','web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.session.issue']}
         : request.action==='web.v2.capabilities'
           ? {origin:request.payload.origin,mcp_status_grants:[]}
+          : request.action==='web.v2.session.issue'
+            ? {endpoint:'http://127.0.0.1:48293',token:'a'.repeat(64),expires_in:600,
+               transport:'local-bridge-http-sse-v2'}
           : request.action==='web.v2.agent.start'
             ? {task_id:'wb-abcde-1234-0',status:'accepted',provider:'workbuddy'}
           : request.action==='web.v2.agent.poll'
@@ -234,6 +237,10 @@ test('Web WorkBuddy accepts once and returns multiple cursor events, with separa
   assert.equal((await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},trustedPage)).code,
     'caller_not_allowed');
   assert.equal((await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},popup)).ok,true);
+  const discovery={...req,requestId:'workbuddy_caps',action:'local.capabilities',params:{}};
+  const capabilities=await send({type:'WEB_REQUEST',request:discovery},trustedPage);
+  assert.equal(capabilities.ok,true);
+  assert.equal(capabilities.result.origin,site);
   const accepted=await send({type:'WEB_REQUEST',request:req},trustedPage);
   assert.equal(accepted.result.status,'accepted');
   assert.equal(nativeMessages.at(-1).request.payload.origin,site);
@@ -251,4 +258,19 @@ test('Web WorkBuddy accepts once and returns multiple cursor events, with separa
   assert.equal((await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:false},popup)).ok,true);
   assert.equal((await send({type:'WEB_REQUEST',request:poll},trustedPage)).code,
     'site_agent_permission_required');
+});
+
+test('Chrome issues one bootstrap credential without relaying task messages',async()=>{
+  nativePermission=true;
+  await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup);
+  await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},popup);
+  const req={channel:'local-tool-bridge:web:v2',version:2,type:'REQUEST',
+    requestId:'session-1',action:'local.connect',params:{}};
+  const received=await send({type:'WEB_REQUEST',request:req},trustedPage);
+  assert.equal(received.ok,true);
+  assert.equal(received.result.endpoint,'http://127.0.0.1:48293');
+  assert.equal(received.result.token.length,64);
+  assert.equal(nativeMessages.at(-1).request.action,'web.v2.session.issue');
+  assert.equal(nativeMessages.at(-1).request.payload.origin,site);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},untrustedPage)).code,'site_not_allowed');
 });

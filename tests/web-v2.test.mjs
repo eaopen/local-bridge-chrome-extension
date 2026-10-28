@@ -66,3 +66,14 @@ test('WorkBuddy start and multiple poll replies have bounded v2 contracts',()=>{
   assert.equal(response.result.events.length,2);
   assert.notEqual(response.result.status,'completed');
 });
+
+test('bootstrap is separate and cannot accept page-supplied origin or command',()=>{
+ const req={...base,action:'local.connect',params:{}};
+ assert.equal(validWebV2Request(req),true);
+ assert.equal(validWebV2Request({...req,params:{origin:'https://attacker.test'}}),false);
+ const native=nativeV2Request('web.v2.session.issue',
+   {origin:'https://app.example.test'},'connect-1');
+ assert.equal(native.protocol_version,2);
+ assert.throws(()=>nativeV2Request('web.v2.session.issue',
+   {origin:'https://app.example.test',command:'shell'},'connect-1'));
+});

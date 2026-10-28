@@ -130,7 +130,7 @@ export function validWebV2Request(message) {
       !Object.keys(message).every(k => ['channel', 'type', 'version', 'requestId', 'action', 'params'].includes(k)))
     return false;
   const p = message.params;
-  if (message.action === 'local.capabilities') {
+  if (message.action === 'local.capabilities' || message.action === 'local.connect') {
     return p === undefined ||
       (p && typeof p === 'object' && !Array.isArray(p) && Object.keys(p).length === 0);
   }
@@ -157,11 +157,12 @@ export function validWebV2Request(message) {
   return false;
 }
 export function nativeV2Request(action, payload, id) {
-  if (!validRequestId(id) || !['web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll'].includes(action) ||
+  if (!validRequestId(id) || !['web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.session.issue'].includes(action) ||
       !payload || typeof payload !== 'object' || Array.isArray(payload))
     throw new Error('Invalid V2 request');
   if (!validatedOrigin(payload.origin + '/')) throw new Error('Invalid V2 origin');
-  if (action === 'web.v2.capabilities' && Object.keys(payload).length !== 1)
+  if (['web.v2.capabilities','web.v2.session.issue'].includes(action) &&
+      Object.keys(payload).length !== 1)
     throw new Error('V2 status payload must be origin only');
   if (action === 'web.v2.mcp.status' && !validWebV2Request({
     channel:WEB_V2_CHANNEL,type:'REQUEST',version:2,requestId:id,

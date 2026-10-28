@@ -60,3 +60,14 @@ local-bridge web-v2 revoke-workbuddy https://your-enterprise-web.example
 Web sends `agent.start` with `{provider:"workbuddy",client_key,prompt}` and receives `status:"accepted",task_id`; only `agent.poll` with `{task_id,cursor}` can retrieve ordered `seq` events, including multiple `message.delta`/`message.final` pairs and a distinct final `task.completed`. Do not interpret a message final as task completion. A lost start response must be retried using the **same** client_key, never a new task key. The user may revoke either site or local grant without affecting Etech or CloudFile V1.
 
 The WorkBuddy native worker currently targets macOS Desktop 5.9.x / Node 24+ and is **not live tested through corporate Web/Chrome**; absence of WorkBuddy must report unavailable. It launches a separate ACP session using the current logged-in desktop account; file, MCP, shell and tool actions remain disabled.
+
+
+## V2 direct HTTP/SSE (preferred)
+
+Chrome is a connection/authentication helper, not the continuous WorkBuddy message transport. After explicit per-origin Chrome and local OS-user grants, the page invokes local.connect once. The Native Host returns a short-lived, origin-scoped credential and localhost endpoint, kept only in page memory.
+
+The Bridge CLI command web-v2 serve binds 127.0.0.1:48293 (never a LAN interface). The page directly uses /v2/capabilities, /v2/workbuddy/tasks, /v2/workbuddy/tasks/{id}/stream?cursor=N (HTTP SSE), /v2/workbuddy/tasks/{id}/events?cursor=N, and /v2/mcp/status. Authentication uses the Authorization Bearer header, never a query-string token. The loopback service checks exact Host, Origin, local user grant and session expiry.
+
+If loopback fetch/SSE is blocked by browser Local Network Access permissions, CORS, or an unavailable daemon, the page falls back to the already implemented short Chrome Native Messaging agent.start/agent.poll, preserving client_key and task_id so WorkBuddy is not submitted twice. Original Etech chat and CloudFile V1 are independent.
+
+SSE is the first one-way event channel, supporting multiple assistant messages and explicit terminal states. WebSocket can be added later for interactive tool approval; it must reuse the same task store and authorization, not another agent/task engine. Real Chrome GUI + signed-in WorkBuddy end-to-end acceptance is still pending.

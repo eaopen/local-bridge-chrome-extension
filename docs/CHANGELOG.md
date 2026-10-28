@@ -4,7 +4,8 @@
 - Only exact top-level origins explicitly approved for local MCP may call V2; the OS user must separately grant one installed provider and a **status-only** tool in Local Bridge CLI. No generic tools/call, Agent run, chat read/send, shell or file write.
 - Use existing independent Native Host with explicit `protocol_version=2` dispatch. No CloudFile Native Host or file workflow changes.
 - Add origin/permission and schema tests; source tests do **not** claim real Chrome GUI, corporate SSO or installed MCP Provider execution has passed.
-- Optional exact-site Web WorkBuddy text start + cursor polling of multiple assistant events, separately granted in Chrome and by local user CLI; no file/MCP/shell tools. Actual native WorkBuddy device end-to-end remains pending.
+- Optional exact-site Web WorkBuddy text start + cursor polling of multiple assistant events, separately granted in Chrome and by local user CLI; no file/MCP/shell tools.
+- Chrome performs one-time localhost session bootstrap; normal WorkBuddy/MCP data uses direct Bridge HTTP/SSE, with Chrome Native Messaging as a failure fallback. Actual native WorkBuddy device end-to-end remains pending.
 - The new feature is a cross-project preview; `eaopen/local-bridge` compatible branch and user's optional Provider are required for a completed status query. Users without Bridge keep existing Capture/Copy/Save and Web AI Relay.
 
 ## v0.5.0 — enterprise Web → local Pi (code, not Store approval)

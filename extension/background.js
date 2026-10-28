@@ -126,9 +126,19 @@ async function onMessage(message, sender) {
     }
     if (message.request?.channel === WEB_V2_CHANNEL) {
       if (!validWebV2Request(message.request)) return {ok:false,code:'unsupported_v2_action'};
-      const isAgent = message.request.action.startsWith('agent.');
-      if (isAgent) {
+      const isAgent = message.request.action.startsWith('agent.') ||
+        message.request.action === 'local.connect';
+      const isDiscovery = message.request.action === 'local.capabilities';
+      if (message.request.action === 'local.connect') {
+        if (!await allowLocalAgentSite(origin) && !await allowLocalToolSite(origin))
+          return {ok:false,code:'site_local_permission_required'};
+      } else if (isAgent) {
         if (!await allowLocalAgentSite(origin)) return {ok:false,code:'site_agent_permission_required'};
+      } else if (isDiscovery) {
+        // Discovery is not permission to run a tool. Agent-only sites must not
+        // require an unrelated personal MCP grant merely to discover WorkBuddy.
+        if (!await allowLocalAgentSite(origin) && !await allowLocalToolSite(origin))
+          return {ok:false,code:'site_local_permission_required'};
       } else if (!await allowLocalToolSite(origin)) return {ok:false,code:'site_mcp_permission_required'};
       if (!await chrome.permissions.contains({permissions:['nativeMessaging']}))
         return {ok:false,code:'native_permission_required'};
@@ -142,13 +152,14 @@ async function onMessage(message, sender) {
           'local.capabilities':'web.v2.capabilities',
           'mcp.status':'web.v2.mcp.status',
           'agent.start':'web.v2.agent.start',
-          'agent.poll':'web.v2.agent.poll'
+          'agent.poll':'web.v2.agent.poll',
+          'local.connect':'web.v2.session.issue'
         })[message.request.action];
         if (!status.result.capabilities.includes(action))
           return {ok:false,code:'native_v2_not_supported'};
         const p = message.request.params || {};
         // Browser-confirmed sender origin; website cannot supply an alternate origin.
-        const payload = action === 'web.v2.capabilities' ? {origin}
+        const payload = ['web.v2.capabilities','web.v2.session.issue'].includes(action) ? {origin}
           : action === 'web.v2.mcp.status' ? {origin,provider:p.provider,tool:p.tool}
           : action === 'web.v2.agent.start'
             ? {origin,provider:p.provider,client_key:p.client_key,prompt:p.prompt}
