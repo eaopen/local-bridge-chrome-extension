@@ -80,6 +80,8 @@
       <p id="siteHint" class="hint">Basic site permission allows read-only discovery only.</p>
       <button id="siteAi" class="wide" disabled>Enable this site's enterprise AI → local Pi</button>
       <p id="siteAiHint" class="hint">Separate one-time permission. Only this exact site can request text-only Pi tasks using its own backend and short-lived authorization. No personal model API setup; local tools stay disabled.</p>
+      <button id="siteAgent" class="wide" disabled>Enable this site's text-only WorkBuddy</button>
+      <p class="hint">V2: WorkBuddy tasks require a separate site grant AND a local user grant; all WorkBuddy tools disabled. Multiple progress messages can be polled by task ID.</p>
       <button id="siteTools" class="wide" disabled>Enable this site's local MCP status</button>
       <p id="siteToolsHint" class="hint">V2: separately authorize status-only MCP on this origin. Each provider/tool must also be granted by the local user CLI. No chat reads, sends, file writes, or arbitrary Agent runs.</p>
     </section>

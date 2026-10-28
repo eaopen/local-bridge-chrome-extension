@@ -46,3 +46,17 @@ The content script forwards the message only after the site's basic permission; 
 - Missing Provider, origin permission or Host returns an actual error; never fake completion. V1 Chrome still works without Local Bridge; CloudFile V1 Host/Agent2 remains separate.
 - WorkBuddy/Codex/Pi V2 agent dispatch and business model API use separate scoped authorization and still require additional implementation and real UI/SSO acceptance.
 - The Chrome page API and Native Host V2's `protocol_version=2` are separate from CloudFile's ApplicationProfile V1. Do not reuse the CloudFile production Chrome extension ID or Host.
+
+## WorkBuddy text task (V2 preview)
+
+A separately granted Web origin can submit one text-only WorkBuddy task and poll the short-lived event log. This uses a **different per-site Agent grant** from MCP status and a separate OS-user command:
+
+```sh
+local-bridge web-v2 grant-workbuddy https://your-enterprise-web.example
+# revoke later
+local-bridge web-v2 revoke-workbuddy https://your-enterprise-web.example
+```
+
+Web sends `agent.start` with `{provider:"workbuddy",client_key,prompt}` and receives `status:"accepted",task_id`; only `agent.poll` with `{task_id,cursor}` can retrieve ordered `seq` events, including multiple `message.delta`/`message.final` pairs and a distinct final `task.completed`. Do not interpret a message final as task completion. A lost start response must be retried using the **same** client_key, never a new task key. The user may revoke either site or local grant without affecting Etech or CloudFile V1.
+
+The WorkBuddy native worker currently targets macOS Desktop 5.9.x / Node 24+ and is **not live tested through corporate Web/Chrome**; absence of WorkBuddy must report unavailable. It launches a separate ACP session using the current logged-in desktop account; file, MCP, shell and tool actions remain disabled.

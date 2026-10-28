@@ -27,6 +27,13 @@ async function allowAiSite(origin) {
   return (await aiSites()).includes(origin) && await allowSite(origin);
 }
 
+async function localAgentSites() {
+  const r = await chrome.storage.local.get('localAgentSites');
+  return Array.isArray(r.localAgentSites) ? r.localAgentSites : [];
+}
+async function allowLocalAgentSite(origin) {
+  return (await localAgentSites()).includes(origin) && await allowSite(origin);
+}
 async function localToolSites() {
   const r = await chrome.storage.local.get('localToolSites');
   return Array.isArray(r.localToolSites) ? r.localToolSites : [];
@@ -119,7 +126,10 @@ async function onMessage(message, sender) {
     }
     if (message.request?.channel === WEB_V2_CHANNEL) {
       if (!validWebV2Request(message.request)) return {ok:false,code:'unsupported_v2_action'};
-      if (!await allowLocalToolSite(origin)) return {ok:false,code:'site_mcp_permission_required'};
+      const isAgent = message.request.action.startsWith('agent.');
+      if (isAgent) {
+        if (!await allowLocalAgentSite(origin)) return {ok:false,code:'site_agent_permission_required'};
+      } else if (!await allowLocalToolSite(origin)) return {ok:false,code:'site_mcp_permission_required'};
       if (!await chrome.permissions.contains({permissions:['nativeMessaging']}))
         return {ok:false,code:'native_permission_required'};
       const key = origin + ':' + sender.tab.id;
@@ -128,14 +138,21 @@ async function onMessage(message, sender) {
       try {
         const status = publicHostStatus(await sendNative('host.status'));
         if (!status.ok) return status;
-        const action = message.request.action === 'local.capabilities'
-          ? 'web.v2.capabilities' : 'web.v2.mcp.status';
+        const action = ({
+          'local.capabilities':'web.v2.capabilities',
+          'mcp.status':'web.v2.mcp.status',
+          'agent.start':'web.v2.agent.start',
+          'agent.poll':'web.v2.agent.poll'
+        })[message.request.action];
         if (!status.result.capabilities.includes(action))
           return {ok:false,code:'native_v2_not_supported'};
         const p = message.request.params || {};
         // Browser-confirmed sender origin; website cannot supply an alternate origin.
-        const payload = action === 'web.v2.capabilities'
-          ? {origin} : {origin,provider:p.provider,tool:p.tool};
+        const payload = action === 'web.v2.capabilities' ? {origin}
+          : action === 'web.v2.mcp.status' ? {origin,provider:p.provider,tool:p.tool}
+          : action === 'web.v2.agent.start'
+            ? {origin,provider:p.provider,client_key:p.client_key,prompt:p.prompt}
+            : {origin,task_id:p.task_id,cursor:p.cursor};
         return sendNativeV2(action, payload);
       } finally { localToolActive.delete(key); }
     }
@@ -209,7 +226,8 @@ async function onMessage(message, sender) {
     if (!message.enabled) {
       await chrome.storage.local.set({
         enterpriseAiSites: (await aiSites()).filter(x => x !== origin),
-        localToolSites: (await localToolSites()).filter(x => x !== origin)
+        localToolSites: (await localToolSites()).filter(x => x !== origin),
+        localAgentSites: (await localAgentSites()).filter(x => x !== origin)
       });
     }
     await refreshContentScripts();
@@ -246,13 +264,28 @@ async function onMessage(message, sender) {
     await chrome.storage.local.set({localToolSites:next});
     return {ok:true,enabled:message.enabled};
   }
+  if (message.type === 'SITE_AGENT_TOGGLE') {
+    const origin = validatedOrigin((message.origin || '') + '/');
+    if (!origin) return {ok:false,code:'invalid_origin'};
+    if (message.enabled && !await allowSite(origin))
+      return {ok:false,code:'site_permission_required'};
+    if (message.enabled && !await chrome.permissions.contains({permissions:['nativeMessaging']}))
+      return {ok:false,code:'native_permission_required'};
+    const current = await localAgentSites();
+    const next = message.enabled ? [...new Set([...current,origin])]
+      : current.filter(x => x !== origin);
+    if (next.length > MAX_SITES) return {ok:false,code:'site_limit'};
+    await chrome.storage.local.set({localAgentSites:next});
+    return {ok:true,enabled:message.enabled};
+  }
   if (message.type === 'GET_SITE') {
     const origin = validatedOrigin(`${message.origin || ''}/`);
     return {
       ok:true,
       allowed:Boolean(origin && await allowSite(origin)),
       ai_enabled:Boolean(origin && await allowAiSite(origin)),
-      tools_enabled:Boolean(origin && await allowLocalToolSite(origin))
+      tools_enabled:Boolean(origin && await allowLocalToolSite(origin)),
+      agent_enabled:Boolean(origin && await allowLocalAgentSite(origin))
     };
   }
   if (message.type === 'HOST_GET') {

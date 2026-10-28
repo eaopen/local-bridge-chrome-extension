@@ -36,3 +36,33 @@ test('V2 Native requests are separately versioned and origin bounded',()=>{
   assert.throws(()=>parseNativeV2Response({protocol_version:1,request_id:'task-1',
     ok:true},'task-1'));
 });
+
+test('WorkBuddy start and multiple poll replies have bounded v2 contracts',()=>{
+  const start={...base,requestId:'wb-start-1',action:'agent.start',
+    params:{provider:'workbuddy',client_key:'client-task-123',
+      prompt:'Summarize this fictional meeting'}};
+  assert.equal(validWebV2Request(start),true);
+  const native=nativeV2Request('web.v2.agent.start',
+    {origin:'https://app.example.test',...start.params},'wb-start-1');
+  assert.equal(native.protocol_version,2);
+  for(const bad of [
+    {...start,params:{...start.params,provider:'shell'}},
+    {...start,params:{...start.params,client_key:'../unsafe'}},
+    {...start,params:{...start.params,prompt:'x'.repeat(13000)}},
+    {...start,params:{...start.params,tools:['write']}},
+  ]) assert.equal(validWebV2Request(bad),false);
+  const poll={...base,requestId:'wb-poll-1',action:'agent.poll',
+    params:{task_id:'wb-abcde-1234-0',cursor:0}};
+  assert.equal(validWebV2Request(poll),true);
+  assert.equal(nativeV2Request('web.v2.agent.poll',
+    {origin:'https://app.example.test',...poll.params},'wb-poll-1').protocol_version,2);
+  assert.equal(validWebV2Request({...poll,params:{...poll.params,cursor:-1}}),false);
+  assert.equal(validWebV2Request({...poll,params:{...poll.params,cursor:'0'}}),false);
+  const response=parseNativeV2Response({protocol_version:2,request_id:'wb-poll-1',
+    ok:true,result:{status:'running',next_seq:2,events:[
+      {seq:1,type:'message.delta',message_id:'m1',text:'Hello'},
+      {seq:2,type:'message.final',message_id:'m1'}]}},'wb-poll-1');
+  assert.equal(response.result.status,'running');
+  assert.equal(response.result.events.length,2);
+  assert.notEqual(response.result.status,'completed');
+});
