@@ -90,6 +90,7 @@ test('unified agent.run options are bounded, never arbitrary shell or model URLs
   for(const invalid of [
     {...valid,agent:'shell'},
     {...valid,model:'https://user:secret@example.com/v1?token=x'},
+    {...valid,model:'https://evil.example'},
     {...valid,think_mode:'unlimited'},
     {...valid,agent_mode:'force'},
     {...valid,agent:'auto',agent_mode:'require'},

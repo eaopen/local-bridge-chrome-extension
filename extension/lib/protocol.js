@@ -156,6 +156,7 @@ export function validWebV2Request(message) {
       new TextEncoder().encode(p.prompt).length <= 12000 &&
       ['auto','workbuddy','codex','pi'].includes(p.agent) &&
       typeof p.model === 'string' && /^[A-Za-z0-9_./:-]{1,128}$/.test(p.model) &&
+      !p.model.includes('://') && !p.model.startsWith('/') &&
       ['auto','off','low','medium','high','xhigh','max'].includes(p.think_mode) &&
       ['prefer','require'].includes(p.agent_mode) &&
       !(p.agent === 'auto' && p.agent_mode === 'require');
