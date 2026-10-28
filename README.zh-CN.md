@@ -15,6 +15,12 @@
 已安装且授权独立 Native Host 时，可按一下「检查 Provider」并主动「发送给 Provider」。**只 ACK 不等于 AI 任务完成**；用户应在目标程序查看完成状态。
 
 
+## v0.4.0：手动 Web AI 接力（不是 9Router）
+
+当 Codex 等本地工具额度耗尽或暂时不可用时，可在当前 Popup 选择 ChatGPT/Gemini/Claude/Copilot/DeepSeek 或自定义 HTTPS 聊天网站，点击 **Copy task & open Web AI**，由用户自己粘贴提示词、继续聊天。完成后选择或粘贴一段 AI 回复，可以 **Copy return package** 给任意工具；可选安装 Local Bridge 时，还能调用 `relay.return` 把结果及原任务引用存入已有本地收件箱。
+
+**不自动抓取网页 AI 回复，不接管网页登录，不自动消耗免费额度，不做模型 API 网关，不自动执行模型建议的 MCP/终端操作。** 即使没有 Local Bridge 或任何 Agent，也能使用复制/返回包功能。浏览器本地只保留一个轻量任务关联记录，不保存聊天正文。详见 [使用说明](docs/WEB_AI_RELAY.md)。
+
 ## v0.3.0：主动点击本机 AI 摘要
 
 在插件弹窗中选中或编辑内容后，可点击 **Summarize with local AI**。只有用户明确点击且本机 Provider 报告支持 `context.summarize` 时才向 Host 发送内容；普通网页不能调用。Local Bridge 的可选实现复用本机已安装和登录的 Codex CLI，以临时只读模式返回结果；使用其他 Provider 时，由其自行实现兼容协议。
@@ -37,6 +43,6 @@ npm run build
 # Chrome -> chrome://extensions -> 开发者模式 -> 加载已解压的扩展 -> extension/
 ```
 
-Node 20+ 只在测试/构建时需要；插件无运行时 npm 依赖。商店包为 `dist/local-tool-bridge-v0.3.0.zip`。正式上架还需要发布者验证、固定扩展 ID、真实 Chrome/系统验证、截图、HTTPS 隐私政策与 Chrome Web Store 审核；**仓库代码通过测试不意味着已经上架**。
+Node 20+ 只在测试/构建时需要；插件无运行时 npm 依赖。商店包为 `dist/local-tool-bridge-v0.4.0.zip`。正式上架还需要发布者验证、固定扩展 ID、真实 Chrome/系统验证、截图、HTTPS 隐私政策与 Chrome Web Store 审核；**仓库代码通过测试不意味着已经上架**。
 
 [Chrome Web Store 准备清单](docs/STORE_RELEASE.md) · [开发约束 AGENTS.md](AGENTS.md)

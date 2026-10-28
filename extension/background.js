@@ -3,6 +3,7 @@
  */
 import { VERSION, HOST_NAME, validateHostName, sanitizePage, validWebRequest, validatedOrigin,
   hostMatch, nativeRequest, parseNativeResponse } from './lib/protocol.js';
+import { relayReturnPayload } from './lib/web-ai-relay.js';
 
 const SCRIPT_ID = 'local-tool-bridge-user-sites-v1';
 const MAX_SITES = 32;
@@ -131,6 +132,19 @@ async function onMessage(message, sender) {
     return { ok: true, host: message.host };
   }
   if (message.type === 'NATIVE_STATUS') return publicHostStatus(await sendNative('host.status'));
+  if (message.type === 'RELAY_RETURN') {
+    // The user alone can submit a reviewed Web AI reply from this popup.
+    // No approved website, model-generated text or content script can call it.
+    let payload;
+    try { payload = relayReturnPayload(message.pending, message.reply); }
+    catch { return { ok: false, code: 'invalid_relay' }; }
+    const status = publicHostStatus(await sendNative('host.status'));
+    if (!status.ok) return status;
+    if (!status.result.capabilities.includes('relay.return')) {
+      return { ok: false, code: 'relay_not_supported' };
+    }
+    return sendNative('relay.return', payload);
+  }
   if (message.type === 'SHARE_CONTEXT' || message.type === 'SUMMARIZE_CONTEXT') {
     const ctx = message.context;
     if (!ctx || typeof ctx !== 'object' || Array.isArray(ctx)) return { ok: false, code: 'invalid_context' };

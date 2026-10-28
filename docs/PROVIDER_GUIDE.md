@@ -25,3 +25,7 @@ A Local Bridge adapter can register the default host ID and return `connected_to
 ## Reference host
 
 `native-host/reference-host.mjs` is a separately run, **development-only** example. It only responds to status and acknowledges context without forwarding or storing it. It is not bundled in Chrome Web Store ZIP and not a substitute for a real Provider or its installer.
+
+## Optional manual Web AI Relay
+
+Providers may implement `relay.return` using a typed, bounded reply and source/task correlation. The action must be advertised in `host.status.capabilities` and may be invoked only from the extension popup after a user has selected/reviewed the reply. `received/stored` is not `completed`, and it never authorizes arbitrary code execution. A Provider need not implement this capability; the standalone extension still offers a copyable return package. See [Web AI Relay](WEB_AI_RELAY.md).

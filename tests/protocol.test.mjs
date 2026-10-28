@@ -27,6 +27,7 @@ test('native protocol only has approved operations, correlated responses', () =>
   assert.equal(r.action,'context.share');
   const ai=nativeRequest('context.summarize',{title:'t',url:'',selection:'s'},'sum_1');
   assert.equal(ai.action,'context.summarize');
+  assert.equal(nativeRequest('relay.return',{relay_id:'rel-0123456789abcdef0123456789abcdef'},'relay_1').action,'relay.return');
   assert.throws(()=>nativeRequest('shell.exec',{},'id1'));
   assert.throws(()=>nativeRequest('context.share',{title:'x'.repeat(70000)},'id1'));
   assert.equal(parseNativeResponse({protocol_version:1,request_id:'id_1',ok:true,result:{received:true}},'id_1').ok,true);
@@ -38,7 +39,7 @@ test('web contract allows discovery only',()=>{
   const base={channel:WEB_CHANNEL,type:'REQUEST',version:1,requestId:'request-1',params:{}};
   assert.equal(validWebRequest({...base,action:'extension.status'}),true);
   assert.equal(validWebRequest({...base,action:'native.status'}),true);
-  for(const action of ['native.invoke','context.share','context.summarize','shell.exec','file.open'])
+  for(const action of ['native.invoke','context.share','context.summarize','relay.return','shell.exec','file.open'])
     assert.equal(validWebRequest({...base,action}),false);
   assert.equal(validWebRequest({...base,action:'extension.status',params:{command:'rm'}}),false);
   assert.equal(validWebRequest({...base,action:'extension.status',shell:'rm'}),false);

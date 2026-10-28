@@ -1,3 +1,10 @@
+## v0.4.0 — manual Web AI Relay (code, not Store approval)
+
+- User-driven Copy task + open Web AI, supported destinations and optional custom HTTPS chat site.
+- One pending source/task reference stored locally without chat transcript; paste or select a reply and copy a return package without a host.
+- Optional popup-only `relay.return` capability to store a reviewed, source-linked response in the existing Local Bridge inbox.
+- No model API routing, quota management, hidden chat automation, automatic tool execution or extra browser permissions. Real Chrome UI/native-host integration still needs target-device acceptance.
+
 ## v0.3.0 — optional user-click AI summaries (code, not Store approval)
 
 - Add `context.summarize` as an **optional** V1 Native Messaging capability, only callable by the extension popup. User reviews selected/edited text and clicks a dedicated button.

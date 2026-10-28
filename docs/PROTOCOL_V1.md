@@ -49,3 +49,7 @@ A successful response reports `{status:"completed",summary:"..."}` only when the
 Do not reuse CloudFile's production Native Host name or Chrome extension ID. The separately developed Local Bridge can later ship its own host implementation with the same framed V1 contract, or provide an explicitly registered alternative. Store listing should not claim a host is built-in or automatically installed.
 
 Further capabilities require explicit version/capability negotiation, source trust and tests. Unknown actions must be rejected; this V1 addition is only `context.summarize` when advertised by the host. No generic `{command, argv, path}` request; no unbounded pass-through to arbitrary host processes. Extension and host own their own versions and upgrades.
+
+## Optional manual Web AI Relay
+
+An optional host may advertise `relay.return`. The extension's popup, **never a website**, sends a bounded `{relay_id,task_ref,web_ai,source:{title,url},reply:{title,url,selection}}` object when the user explicitly clicks Return to local provider. The Local Bridge implementation stores it under its existing user-owned inbox and reports `received/stored` rather than `completed`. It does not process it with a model, apply patches, or call an MCP tool. Web chat prompting is a separate user-controlled clipboard operation, **not** an API action on the Native Host. See [manual Web AI Relay](WEB_AI_RELAY.md).
