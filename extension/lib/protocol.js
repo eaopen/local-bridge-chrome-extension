@@ -148,6 +148,18 @@ export function validWebV2Request(message) {
       typeof p.prompt === 'string' && p.prompt.trim().length > 0 &&
       new TextEncoder().encode(p.prompt).length <= 12000;
   }
+  if (message.action === 'agent.run') {
+    return p && typeof p === 'object' && !Array.isArray(p) &&
+      Object.keys(p).length === 6 &&
+      /^[A-Za-z0-9_.-]{1,80}$/.test(p.client_key || '') &&
+      typeof p.prompt === 'string' && Boolean(p.prompt.trim()) &&
+      new TextEncoder().encode(p.prompt).length <= 12000 &&
+      ['auto','workbuddy','codex','pi'].includes(p.agent) &&
+      typeof p.model === 'string' && /^[A-Za-z0-9_./:-]{1,128}$/.test(p.model) &&
+      ['auto','off','low','medium','high','xhigh','max'].includes(p.think_mode) &&
+      ['prefer','require'].includes(p.agent_mode) &&
+      !(p.agent === 'auto' && p.agent_mode === 'require');
+  }
   if (message.action === 'agent.poll') {
     return p && typeof p === 'object' && !Array.isArray(p) &&
       Object.keys(p).length === 2 &&
@@ -157,7 +169,7 @@ export function validWebV2Request(message) {
   return false;
 }
 export function nativeV2Request(action, payload, id) {
-  if (!validRequestId(id) || !['web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.session.issue'].includes(action) ||
+  if (!validRequestId(id) || !['web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.agent.run','web.v2.session.issue'].includes(action) ||
       !payload || typeof payload !== 'object' || Array.isArray(payload))
     throw new Error('Invalid V2 request');
   if (!validatedOrigin(payload.origin + '/')) throw new Error('Invalid V2 origin');
@@ -169,13 +181,19 @@ export function nativeV2Request(action, payload, id) {
     action:'mcp.status',params:{provider:payload.provider,tool:payload.tool}
   })) throw new Error('Unsupported V2 MCP request');
   const v2Agent = action === 'web.v2.agent.start' ? 'agent.start'
-    : action === 'web.v2.agent.poll' ? 'agent.poll' : null;
+    : action === 'web.v2.agent.poll' ? 'agent.poll'
+    : action === 'web.v2.agent.run' ? 'agent.run' : null;
   if (v2Agent && (!validWebV2Request({
     channel:WEB_V2_CHANNEL,type:'REQUEST',version:2,requestId:id,
     action:v2Agent,params:v2Agent === 'agent.start'
       ? {provider:payload.provider,client_key:payload.client_key,prompt:payload.prompt}
-      : {task_id:payload.task_id,cursor:payload.cursor}
-  }) || Object.keys(payload).length !== (v2Agent === 'agent.start' ? 4 : 3))) {
+      : v2Agent === 'agent.run'
+        ? {client_key:payload.client_key,prompt:payload.prompt,
+           agent:payload.agent,model:payload.model,
+           think_mode:payload.think_mode,agent_mode:payload.agent_mode}
+        : {task_id:payload.task_id,cursor:payload.cursor}
+  }) || Object.keys(payload).length !== (v2Agent === 'agent.start' ? 4 :
+      v2Agent === 'agent.run' ? 7 : 3))) {
     throw new Error('Unsupported V2 Agent request');
   }
   return {protocol_version:2,request_id:id,action,payload};

@@ -77,3 +77,26 @@ test('bootstrap is separate and cannot accept page-supplied origin or command',(
  assert.throws(()=>nativeV2Request('web.v2.session.issue',
    {origin:'https://app.example.test',command:'shell'},'connect-1'));
 });
+
+test('unified agent.run options are bounded, never arbitrary shell or model URLs',()=>{
+  const valid={client_key:'task-123',prompt:'Summarize a synthetic note',
+    agent:'codex',model:'auto',think_mode:'high',agent_mode:'prefer'}
+  const envelope={channel:WEB_V2_CHANNEL,version:2,type:'REQUEST',
+    requestId:'unified-1',action:'agent.run',params:valid}
+  assert.equal(validWebV2Request(envelope),true)
+  const native=nativeV2Request('web.v2.agent.run',
+    {origin:'https://app.example.test',...valid},'unified-1')
+  assert.equal(native.protocol_version,2)
+  for(const invalid of [
+    {...valid,agent:'shell'},
+    {...valid,model:'https://user:secret@example.com/v1?token=x'},
+    {...valid,think_mode:'unlimited'},
+    {...valid,agent_mode:'force'},
+    {...valid,agent:'auto',agent_mode:'require'},
+    {...valid,command:'rm'},
+  ]) {
+    assert.equal(validWebV2Request({...envelope,params:invalid}),false)
+  }
+  assert.throws(()=>nativeV2Request('web.v2.agent.run',
+    {origin:'https://app.example.test',...valid,command:'rm'},'unified-1'))
+})
