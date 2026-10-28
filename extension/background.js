@@ -131,13 +131,23 @@ async function onMessage(message, sender) {
     return { ok: true, host: message.host };
   }
   if (message.type === 'NATIVE_STATUS') return publicHostStatus(await sendNative('host.status'));
-  if (message.type === 'SHARE_CONTEXT') {
+  if (message.type === 'SHARE_CONTEXT' || message.type === 'SUMMARIZE_CONTEXT') {
     const ctx = message.context;
     if (!ctx || typeof ctx !== 'object' || Array.isArray(ctx)) return { ok: false, code: 'invalid_context' };
     const { title, url, selection } = ctx;
     if ([title, url, selection].some(x => typeof x !== 'string')) return { ok: false, code: 'invalid_context' };
     const clean = sanitizePage({ title, url, selection });
     if (!clean.selection.trim() || selection.length > 16000) return { ok: false, code: 'invalid_context' };
+    if (message.type === 'SUMMARIZE_CONTEXT') {
+      // The approved website interface cannot reach this branch. Only the
+      // extension popup can explicitly request an AI task.
+      const status = publicHostStatus(await sendNative('host.status'));
+      if (!status.ok) return status;
+      if (!status.result.capabilities.includes('context.summarize')) {
+        return { ok: false, code: 'summary_not_supported' };
+      }
+      return sendNative('context.summarize', clean);
+    }
     return sendNative('context.share', clean);
   }
   return { ok: false, code: 'unsupported_action' };

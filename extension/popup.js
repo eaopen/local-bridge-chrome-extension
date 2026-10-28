@@ -100,6 +100,39 @@ $('share').addEventListener('click', async () => {
   if (reply.result?.forwarded === true) notify('Provider confirmed forwarding the content. Check the provider for task completion.');
   else notify('Provider acknowledged receipt; no completed AI/file task was confirmed.');
 });
+$('summarize').addEventListener('click', async () => {
+  const edited = editableContext();
+  if (!edited.selection.trim()) return notify('Capture or type some content first.');
+  if ($('preview').value.length > MAX_SELECTION) return notify('Content exceeds local summary limit.');
+  if (!await requestNative()) return notify('Native Messaging permission was not granted.');
+  const button = $('summarize');
+  button.disabled = true;
+  $('summaryBox').hidden = true;
+  $('summaryText').value = '';
+  notify('Asking the installed local provider to summarize your reviewed text...');
+  try {
+    const reply = await bridgeMessage({ type: 'SUMMARIZE_CONTEXT', context: edited });
+    if (!reply?.ok) {
+      return notify(`Local AI unavailable (${reply?.error || reply?.code || 'unknown'}). Copy/Save still work.`);
+    }
+    if (reply.result?.status !== 'completed' || typeof reply.result?.summary !== 'string') {
+      return notify('The provider has not confirmed a completed summary.');
+    }
+    $('summaryText').value = reply.result.summary;
+    $('summaryBox').hidden = false;
+    notify('Summary completed by the selected local provider. You can copy it.');
+  } catch {
+    notify('The local summary request did not complete. Copy/Save still work.');
+  } finally {
+    button.disabled = false;
+  }
+});
+$('summaryCopy').addEventListener('click', async () => {
+  const summary = $('summaryText').value;
+  if (!summary) return notify('No completed summary to copy.');
+  try { await navigator.clipboard.writeText(summary); notify('Summary copied.'); }
+  catch { notify('Clipboard unavailable. Select the summary text to copy.'); }
+});
 $('site').addEventListener('click', async () => {
   if (!origin) return;
   const next = !enabled;

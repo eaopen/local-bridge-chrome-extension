@@ -27,6 +27,13 @@
     <section>
       <div class="eyebrow">OPTIONAL LOCAL CONNECTION</div>
       <div class="actions"><button id="native">Check provider</button><button id="share" class="primary">Send to provider</button></div>
+      <button id="summarize" class="wide summary-action">Summarize with local AI (optional)</button>
+      <p class="hint">Only runs when you click. The installed provider may use a cloud model. Keep this popup open until it finishes.</p>
+      <div id="summaryBox" hidden>
+        <label class="eyebrow" for="summaryText">AI SUMMARY</label>
+        <textarea id="summaryText" rows="7" readonly spellcheck="false"></textarea>
+        <button id="summaryCopy">Copy summary</button>
+      </div>
       <p class="meta" id="providerStatus">No provider checked. The extension works without one.</p>
       <details>
         <summary>Provider settings</summary>

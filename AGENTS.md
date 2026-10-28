@@ -7,3 +7,4 @@
 5. Avoid cloud telemetry, remote code, page-wide scraping and unrelated browser permissions; follow Chrome Web Store Manifest V3 single-purpose and accurate privacy standards.
 6. Mark experimental/placeholder native integration honestly. Do not claim a reference host has executed a Local Bridge/Agent task.
 7. Prefer narrow tests and one true browser scenario; no overly broad abstraction or governance layers.
+8. The optional `context.summarize` path is **popup user-click only**, capability-gated, with a fixed typed payload. Approved webpages may never invoke AI/tools. Do not describe a locally installed CLI as inherently offline: its configured model could be remote.

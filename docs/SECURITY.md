@@ -12,3 +12,7 @@
 Known limitation: Chrome host matching doesn't isolate ports. We check and store exact origin (`scheme://host[:port]`) in the service worker, but content-script injection is limited to scheme+hostname; it stays passive on unapproved ports.
 
 - When disabling the last approved origin for a given Chrome host pattern, the popup also attempts to remove that optional host permission. Browser content scripts are registered only for approved sites and the worker rechecks exact origin.
+
+## Explicit local AI summary (v0.3)
+
+The optional `context.summarize` is available **only** via the trusted extension popup click. The background service worker checks the native host's reported capability, sanitizes the current page context, and rejects website-originated requests even for approved sites. No generic command/model/prompt endpoint is opened. Selected content may reach the user's chosen model provider, which can be network-based; never claim that an installed *local client* means the model inference stays entirely on-device. Missing host/feature leaves Copy/Save independent.
