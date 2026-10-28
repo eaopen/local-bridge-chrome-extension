@@ -6,6 +6,12 @@
 
 **Single purpose:** explicitly transfer user-reviewed context from the current page to user-chosen local tools. No passive browsing capture, remote scripts, analytics, cookie access, browser identity management, or general-purpose command execution.
 
+## v0.6.2 — one Agent V2 API, plain loopback HTTP by default
+
+The V2 browser interface for Agent tasks is **only** `agent.run` / `agent.read`. The build-time Local Bridge Web SDK uses `runAgent({apiVersion:2,clientKey,prompt,agent?,model?,thinkMode?,agentMode?})` and `readAgent(taskId,cursor,onEvent)`. The previous unshipped vendor-specific `agent.start/poll` has been removed; WorkBuddy remains an internal runtime adapter. Agents may be WorkBuddy/Codex/Pi, but today only WorkBuddy has Web V2 text execution. Requested models/thinking modes that the chosen adapter cannot apply fail before submission.
+
+The ordinary Web data channel is **`http://127.0.0.1:48293`**, no TLS or local certificates. Chrome 142+/145+ may prompt for **Local Network Access / loopback-network**; the user/browser owns that permission. If direct loopback HTTP/SSE is blocked, the same V2 task uses **Chrome Native Messaging** fallback without a duplicate task ID or extra model route. Trusted enterprise HTTPS localhost proxy is optional and separately installed; neither local HTTPS nor certificate setup is the default. See [Web V2](docs/WEB_V2_MCP.md).
+
 ## v0.5.0 — enterprise Web → local Pi without personal model setup
 
 An existing enterprise Web app can use its **own server-provided AI API** as the model source for a locally installed Pi Agent. After the user separately enables **enterprise AI** for the exact website origin, the already-logged-in app obtains a short-lived model ticket from its own backend and invokes one bounded, text-only `enterprise.pi.run` operation through this Chrome extension and an optional Local Bridge Native Host. No personal Pi API key, new model routing account, arbitrary website executable or file-access tool is required. The scoped ticket is used in-flight only; no browser cookies or permanent credentials are collected.

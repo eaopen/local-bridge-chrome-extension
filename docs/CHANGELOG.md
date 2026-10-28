@@ -1,3 +1,10 @@
+## v0.6.2 — versioned generic Agent run/read, loopback HTTP default
+
+- Remove the unshipped Web V2 `agent.start/poll` and `web.v2.agent.start/poll` calls. Require `api_version=2` for generic `agent.run`, use `agent.read` for cursor-based updates.
+- Support optional WorkBuddy/Codex/Pi Agent, Model and ThinkMode selectors as the **same typed contract**; Bridge may reject unimplemented models/reasoning levels instead of claiming support.
+- Keep `http://127.0.0.1:48293` as the normal no-TLS loopback channel. Chrome 142/145 LNA permission is handled by the browser; use Native Messaging fallback if HTTP/SSE is blocked. No automatic certificate trust or default HTTPS.
+- No change to existing CloudFile V1, Web AI Relay or Chrome site permission grants; real three-Agent Web E2E remains pending.
+
 ## v0.6.1 — unified Agent request parameters (experimental)
 
 - Add optional typed agent/model/think_mode/agent_mode to the existing Web V2 transport. Chrome only verifies the schema, actual top-frame Origin and local site permission, and forwards to Local Bridge. Provider selection and option support are Bridge responsibilities.

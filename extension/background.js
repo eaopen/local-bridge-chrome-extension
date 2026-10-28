@@ -151,9 +151,8 @@ async function onMessage(message, sender) {
         const action = ({
           'local.capabilities':'web.v2.capabilities',
           'mcp.status':'web.v2.mcp.status',
-          'agent.start':'web.v2.agent.start',
-          'agent.poll':'web.v2.agent.poll',
           'agent.run':'web.v2.agent.run',
+          'agent.read':'web.v2.agent.read',
           'local.connect':'web.v2.session.issue'
         })[message.request.action];
         if (!status.result.capabilities.includes(action))
@@ -162,12 +161,10 @@ async function onMessage(message, sender) {
         // Browser-confirmed sender origin; website cannot supply an alternate origin.
         const payload = ['web.v2.capabilities','web.v2.session.issue'].includes(action) ? {origin}
           : action === 'web.v2.mcp.status' ? {origin,provider:p.provider,tool:p.tool}
-          : action === 'web.v2.agent.start'
-            ? {origin,provider:p.provider,client_key:p.client_key,prompt:p.prompt}
-            : action === 'web.v2.agent.run'
-              ? {origin,client_key:p.client_key,prompt:p.prompt,
-                agent:p.agent,model:p.model,think_mode:p.think_mode,agent_mode:p.agent_mode}
-              : {origin,task_id:p.task_id,cursor:p.cursor};
+          : action === 'web.v2.agent.run'
+            ? {origin,api_version:p.api_version,client_key:p.client_key,prompt:p.prompt,
+              agent:p.agent,model:p.model,think_mode:p.think_mode,agent_mode:p.agent_mode}
+            : {origin,task_id:p.task_id,cursor:p.cursor};
         return sendNativeV2(action, payload);
       } finally { localToolActive.delete(key); }
     }

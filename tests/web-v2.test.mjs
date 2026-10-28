@@ -37,34 +37,44 @@ test('V2 Native requests are separately versioned and origin bounded',()=>{
     ok:true},'task-1'));
 });
 
-test('WorkBuddy start and multiple poll replies have bounded v2 contracts',()=>{
-  const start={...base,requestId:'wb-start-1',action:'agent.start',
-    params:{provider:'workbuddy',client_key:'client-task-123',
-      prompt:'Summarize this fictional meeting'}};
-  assert.equal(validWebV2Request(start),true);
-  const native=nativeV2Request('web.v2.agent.start',
-    {origin:'https://app.example.test',...start.params},'wb-start-1');
+test('unified Agent V2 run/read contracts are provider-neutral and versioned',()=>{
+  const params={api_version:2,client_key:'client-task-123',
+    prompt:'Summarize a fictional meeting',agent:'workbuddy',
+    model:'auto',think_mode:'auto',agent_mode:'require'};
+  const request={...base,requestId:'agent-run-1',action:'agent.run',params};
+  assert.equal(validWebV2Request(request),true);
+  const native=nativeV2Request('web.v2.agent.run',
+    {origin:'https://app.example.test',...params},'agent-run-1');
   assert.equal(native.protocol_version,2);
   for(const bad of [
-    {...start,params:{...start.params,provider:'shell'}},
-    {...start,params:{...start.params,client_key:'../unsafe'}},
-    {...start,params:{...start.params,prompt:'x'.repeat(13000)}},
-    {...start,params:{...start.params,tools:['write']}},
-  ]) assert.equal(validWebV2Request(bad),false);
-  const poll={...base,requestId:'wb-poll-1',action:'agent.poll',
+    {...params,api_version:1},
+    {...params,api_version:undefined},
+    {...params,agent:'shell'},
+    {...params,client_key:'../unsafe'},
+    {...params,prompt:'x'.repeat(13000)},
+    {...params,tools:['write']},
+  ]) assert.equal(validWebV2Request({...request,params:bad}),false);
+  const read={...base,requestId:'agent-read-1',action:'agent.read',
     params:{task_id:'wb-abcde-1234-0',cursor:0}};
-  assert.equal(validWebV2Request(poll),true);
-  assert.equal(nativeV2Request('web.v2.agent.poll',
-    {origin:'https://app.example.test',...poll.params},'wb-poll-1').protocol_version,2);
-  assert.equal(validWebV2Request({...poll,params:{...poll.params,cursor:-1}}),false);
-  assert.equal(validWebV2Request({...poll,params:{...poll.params,cursor:'0'}}),false);
-  const response=parseNativeV2Response({protocol_version:2,request_id:'wb-poll-1',
+  assert.equal(validWebV2Request(read),true);
+  assert.equal(nativeV2Request('web.v2.agent.read',
+    {origin:'https://app.example.test',...read.params},'agent-read-1').protocol_version,2);
+  for(const task of ['codex-job-1','pi-job-1','wb-job-1']) {
+    assert.equal(validWebV2Request({...read,params:{task_id:task,cursor:0}}),true);
+  }
+  assert.equal(validWebV2Request({...read,params:{...read.params,cursor:-1}}),false);
+  assert.equal(validWebV2Request({...read,params:{...read.params,cursor:'0'}}),false);
+  const response=parseNativeV2Response({protocol_version:2,request_id:'agent-read-1',
     ok:true,result:{status:'running',next_seq:2,events:[
       {seq:1,type:'message.delta',message_id:'m1',text:'Hello'},
-      {seq:2,type:'message.final',message_id:'m1'}]}},'wb-poll-1');
+      {seq:2,type:'message.final',message_id:'m1'}]}},'agent-read-1');
   assert.equal(response.result.status,'running');
   assert.equal(response.result.events.length,2);
   assert.notEqual(response.result.status,'completed');
+  for(const old of ['web.v2.agent.start','web.v2.agent.poll']) {
+    assert.throws(()=>nativeV2Request(old,
+      {origin:'https://app.example.test',...params},'old-client'));
+  }
 });
 
 test('bootstrap is separate and cannot accept page-supplied origin or command',()=>{
@@ -79,7 +89,7 @@ test('bootstrap is separate and cannot accept page-supplied origin or command',(
 });
 
 test('unified agent.run options are bounded, never arbitrary shell or model URLs',()=>{
-  const valid={client_key:'task-123',prompt:'Summarize a synthetic note',
+  const valid={api_version:2,client_key:'task-123',prompt:'Summarize a synthetic note',
     agent:'codex',model:'auto',think_mode:'high',agent_mode:'prefer'}
   const envelope={channel:WEB_V2_CHANNEL,version:2,type:'REQUEST',
     requestId:'unified-1',action:'agent.run',params:valid}
@@ -88,6 +98,7 @@ test('unified agent.run options are bounded, never arbitrary shell or model URLs
     {origin:'https://app.example.test',...valid},'unified-1')
   assert.equal(native.protocol_version,2)
   for(const invalid of [
+    {...valid,api_version:1},
     {...valid,agent:'shell'},
     {...valid,model:'https://user:secret@example.com/v1?token=x'},
     {...valid,model:'https://evil.example'},
