@@ -1,3 +1,8 @@
+## v0.6.1 — unified Agent request parameters (experimental)
+
+- Add optional typed agent/model/think_mode/agent_mode to the existing Web V2 transport. Chrome only verifies the schema, actual top-frame Origin and local site permission, and forwards to Local Bridge. Provider selection and option support are Bridge responsibilities.
+- No second model routing layer inside Chrome. WorkBuddy-only Web execution remains current; unverified model/think mode overrides fail before execution. Existing V1 and Web V2 agent.start/poll remain compatible.
+
 ## v0.6.0 — experimental Web V2 MCP status, separate grants
 
 - Add separately versioned `local-tool-bridge:web:v2` requests for `local.capabilities` and `mcp.status`; keep old V1 browser/Native Messaging actions untouched.

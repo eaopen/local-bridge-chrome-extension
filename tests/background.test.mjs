@@ -15,12 +15,15 @@ globalThis.chrome={
     async sendNativeMessage(host,request){nativeMessages.push({host,request});return {
       protocol_version:request.protocol_version,request_id:request.request_id,ok:true,
       result: request.action==='host.status'
-        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run','web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.session.issue']}
+        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run','web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.agent.run','web.v2.session.issue']}
         : request.action==='web.v2.capabilities'
           ? {origin:request.payload.origin,mcp_status_grants:[]}
           : request.action==='web.v2.session.issue'
             ? {endpoint:'http://127.0.0.1:48293',token:'a'.repeat(64),expires_in:600,
                transport:'local-bridge-http-sse-v2'}
+           : request.action==='web.v2.agent.run'
+            ? {task_id:'wb-abcde-1234-0',status:'accepted',selected_agent:'workbuddy',
+               selection:'fallback_before_execution',applied_model:null,applied_think_mode:null}
           : request.action==='web.v2.agent.start'
             ? {task_id:'wb-abcde-1234-0',status:'accepted',provider:'workbuddy'}
           : request.action==='web.v2.agent.poll'
@@ -274,3 +277,21 @@ test('Chrome issues one bootstrap credential without relaying task messages',asy
   assert.equal(nativeMessages.at(-1).request.payload.origin,site);
   assert.equal((await send({type:'WEB_REQUEST',request:req},untrustedPage)).code,'site_not_allowed');
 });
+
+test('unified Agent run stays origin-bound and returns Bridge-selected provider',async()=>{
+  nativePermission=true
+  await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup)
+  await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},popup)
+  const request={channel:'local-tool-bridge:web:v2',version:2,type:'REQUEST',
+    requestId:'generic-run1',action:'agent.run',params:{
+      client_key:'task-123',prompt:'Synthetic short task',agent:'codex',
+      model:'auto',think_mode:'auto',agent_mode:'prefer'}}
+  const reply=await send({type:'WEB_REQUEST',request},trustedPage)
+  assert.equal(reply.ok,true)
+  assert.equal(reply.result.selected_agent,'workbuddy')
+  assert.equal(nativeMessages.at(-1).request.action,'web.v2.agent.run')
+  assert.equal(nativeMessages.at(-1).request.payload.origin,site)
+  assert.equal(nativeMessages.at(-1).request.payload.agent,'codex')
+  assert.equal(nativeMessages.at(-1).request.payload.think_mode,'auto')
+  assert.equal((await send({type:'WEB_REQUEST',request},untrustedPage)).code,'site_not_allowed')
+})

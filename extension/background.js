@@ -153,6 +153,7 @@ async function onMessage(message, sender) {
           'mcp.status':'web.v2.mcp.status',
           'agent.start':'web.v2.agent.start',
           'agent.poll':'web.v2.agent.poll',
+          'agent.run':'web.v2.agent.run',
           'local.connect':'web.v2.session.issue'
         })[message.request.action];
         if (!status.result.capabilities.includes(action))
@@ -163,7 +164,10 @@ async function onMessage(message, sender) {
           : action === 'web.v2.mcp.status' ? {origin,provider:p.provider,tool:p.tool}
           : action === 'web.v2.agent.start'
             ? {origin,provider:p.provider,client_key:p.client_key,prompt:p.prompt}
-            : {origin,task_id:p.task_id,cursor:p.cursor};
+            : action === 'web.v2.agent.run'
+              ? {origin,client_key:p.client_key,prompt:p.prompt,
+                agent:p.agent,model:p.model,think_mode:p.think_mode,agent_mode:p.agent_mode}
+              : {origin,task_id:p.task_id,cursor:p.cursor};
         return sendNativeV2(action, payload);
       } finally { localToolActive.delete(key); }
     }
