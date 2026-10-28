@@ -7,6 +7,7 @@ let context = { url: '', title: '', selection: '' };
 let origin = null;
 let enabled = false;
 let aiEnabled = false;
+let toolsEnabled = false;
 let tabId = null;
 let pendingRelay = null;
 const notify = message => { $('status').textContent = message; };
@@ -27,6 +28,7 @@ async function refreshSite() {
     origin = null;
     $('site').disabled = true;
     $('siteAi').disabled = true;
+    $('siteTools').disabled = true;
     $('siteHint').textContent = 'This Chrome page cannot enable website integration.';
     return;
   }
@@ -34,6 +36,11 @@ async function refreshSite() {
   const result = await bridgeMessage({ type: 'GET_SITE', origin });
   enabled = Boolean(result?.allowed);
   aiEnabled = Boolean(result?.ai_enabled);
+  toolsEnabled = Boolean(result?.tools_enabled);
+  $('siteTools').disabled = false;
+  $('siteTools').textContent = toolsEnabled
+    ? "Disable this site's local MCP status"
+    : "Enable this site's local MCP status";
   $('site').disabled = false;
   $('siteAi').disabled = false;
   $('siteAi').textContent = aiEnabled
@@ -290,6 +297,8 @@ $('site').addEventListener('click', async () => {
   enabled = next;
   if (!next) {
     aiEnabled = false;
+    toolsEnabled = false;
+    $('siteTools').textContent = "Enable this site's local MCP status";
     $('siteAi').textContent = 'Enable this site\'s enterprise AI → local Pi';
     const data = await chrome.storage.local.get('trustedSites');
     const remaining = Array.isArray(data.trustedSites) ? data.trustedSites : [];
@@ -325,6 +334,21 @@ $('siteAi').addEventListener('click', async () => {
   notify(next
     ? 'This site may call Pi with its own authenticated enterprise AI ticket. No local file tools.'
     : 'Local enterprise AI permission revoked for this site.');
+});
+$('siteTools').addEventListener('click', async () => {
+  if (!origin) return;
+  const next = !toolsEnabled;
+  if (next && !enabled) return notify('Allow this site first.');
+  if (next && !await requestNative())
+    return notify('Native Messaging permission is required for local MCP status.');
+  const reply = await bridgeMessage({type:'SITE_TOOLS_TOGGLE',origin,enabled:next});
+  if (!reply?.ok) return notify('Local MCP permission not changed (' + (reply?.code || 'unknown') + ').');
+  toolsEnabled = next;
+  $('siteTools').textContent = next
+    ? "Disable this site's local MCP status"
+    : "Enable this site's local MCP status";
+  notify(next ? 'Status-only MCP is allowed for this site; local tool grants are still required.'
+    : 'Local MCP website permission revoked.');
 });
 $('hostSave').addEventListener('click', async () => {
   const value = $('hostName').value.trim();

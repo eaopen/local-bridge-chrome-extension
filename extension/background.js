@@ -2,7 +2,8 @@
  *  Register all event listeners synchronously, no default page monitoring.
  */
 import { VERSION, HOST_NAME, validateHostName, sanitizePage, validWebRequest, validatedOrigin,
-  hostMatch, nativeRequest, parseNativeResponse } from './lib/protocol.js';
+  hostMatch, nativeRequest, parseNativeResponse,
+  WEB_V2_CHANNEL, validWebV2Request, nativeV2Request, parseNativeV2Response } from './lib/protocol.js';
 import { relayReturnPayload } from './lib/web-ai-relay.js';
 
 const SCRIPT_ID = 'local-tool-bridge-user-sites-v1';
@@ -10,6 +11,7 @@ const MAX_SITES = 32;
 const nativeStatusLast = new Map(); // soft resource limit for an approved web page
 const enterpriseLast = new Map();
 const enterpriseActive = new Set();
+const localToolActive = new Set();
 
 async function sites() {
   const result = await chrome.storage.local.get('trustedSites');
@@ -25,6 +27,13 @@ async function allowAiSite(origin) {
   return (await aiSites()).includes(origin) && await allowSite(origin);
 }
 
+async function localToolSites() {
+  const r = await chrome.storage.local.get('localToolSites');
+  return Array.isArray(r.localToolSites) ? r.localToolSites : [];
+}
+async function allowLocalToolSite(origin) {
+  return (await localToolSites()).includes(origin) && await allowSite(origin);
+}
 async function allowSite(origin) {
   return (await sites()).includes(origin) &&
     await chrome.permissions.contains({ origins: [hostMatch(origin)] });
@@ -81,6 +90,19 @@ async function sendNative(action, payload = {}) {
   }
 }
 
+async function sendNativeV2(action, payload) {
+  if (!await chrome.permissions.contains({permissions:['nativeMessaging']}))
+    return {ok:false,code:'native_permission_required'};
+  const id = 'r' + crypto.randomUUID().replaceAll('-', '');
+  let req;
+  try { req = nativeV2Request(action, payload, id); }
+  catch { return {ok:false,code:'invalid_v2_native_request'}; }
+  try {
+    const saved = await chrome.storage.local.get('nativeHost');
+    const host = validateHostName(saved?.nativeHost) ? saved.nativeHost : HOST_NAME;
+    return parseNativeV2Response(await chrome.runtime.sendNativeMessage(host, req), id);
+  } catch { return {ok:false,code:'native_v2_unavailable'}; }
+}
 async function onMessage(message, sender) {
   if (!message || typeof message !== 'object') return { ok: false, code: 'invalid_request' };
 
@@ -94,6 +116,28 @@ async function onMessage(message, sender) {
     if (!sender.tab || sender.frameId !== 0 || !origin ||
         new URL(sender.url).origin !== origin || !await allowSite(origin)) {
       return { ok: false, code: 'site_not_allowed' };
+    }
+    if (message.request?.channel === WEB_V2_CHANNEL) {
+      if (!validWebV2Request(message.request)) return {ok:false,code:'unsupported_v2_action'};
+      if (!await allowLocalToolSite(origin)) return {ok:false,code:'site_mcp_permission_required'};
+      if (!await chrome.permissions.contains({permissions:['nativeMessaging']}))
+        return {ok:false,code:'native_permission_required'};
+      const key = origin + ':' + sender.tab.id;
+      if (localToolActive.has(key)) return {ok:false,code:'local_tool_busy'};
+      localToolActive.add(key);
+      try {
+        const status = publicHostStatus(await sendNative('host.status'));
+        if (!status.ok) return status;
+        const action = message.request.action === 'local.capabilities'
+          ? 'web.v2.capabilities' : 'web.v2.mcp.status';
+        if (!status.result.capabilities.includes(action))
+          return {ok:false,code:'native_v2_not_supported'};
+        const p = message.request.params || {};
+        // Browser-confirmed sender origin; website cannot supply an alternate origin.
+        const payload = action === 'web.v2.capabilities'
+          ? {origin} : {origin,provider:p.provider,tool:p.tool};
+        return sendNativeV2(action, payload);
+      } finally { localToolActive.delete(key); }
     }
     if (!validWebRequest(message.request)) return { ok: false, code: 'unsupported_action' };
     switch (message.request.action) {
@@ -164,7 +208,8 @@ async function onMessage(message, sender) {
     await chrome.storage.local.set({ trustedSites: next });
     if (!message.enabled) {
       await chrome.storage.local.set({
-        enterpriseAiSites: (await aiSites()).filter(x => x !== origin)
+        enterpriseAiSites: (await aiSites()).filter(x => x !== origin),
+        localToolSites: (await localToolSites()).filter(x => x !== origin)
       });
     }
     await refreshContentScripts();
@@ -187,12 +232,27 @@ async function onMessage(message, sender) {
     await chrome.storage.local.set({enterpriseAiSites:next});
     return {ok:true,enabled:message.enabled};
   }
+  if (message.type === 'SITE_TOOLS_TOGGLE') {
+    const origin = validatedOrigin((message.origin || '') + '/');
+    if (!origin) return {ok:false,code:'invalid_origin'};
+    if (message.enabled && !await allowSite(origin))
+      return {ok:false,code:'site_permission_required'};
+    if (message.enabled && !await chrome.permissions.contains({permissions:['nativeMessaging']}))
+      return {ok:false,code:'native_permission_required'};
+    const current = await localToolSites();
+    const next = message.enabled ? [...new Set([...current,origin])]
+      : current.filter(x => x !== origin);
+    if (next.length > MAX_SITES) return {ok:false,code:'site_limit'};
+    await chrome.storage.local.set({localToolSites:next});
+    return {ok:true,enabled:message.enabled};
+  }
   if (message.type === 'GET_SITE') {
     const origin = validatedOrigin(`${message.origin || ''}/`);
     return {
       ok:true,
       allowed:Boolean(origin && await allowSite(origin)),
-      ai_enabled:Boolean(origin && await allowAiSite(origin))
+      ai_enabled:Boolean(origin && await allowAiSite(origin)),
+      tools_enabled:Boolean(origin && await allowLocalToolSite(origin))
     };
   }
   if (message.type === 'HOST_GET') {

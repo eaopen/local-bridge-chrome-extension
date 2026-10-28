@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 const site='https://example.test';
 const listeners={};const granted=new Set([`${site}/*`]);
-let stored=[];let aiSitesStored=[];let selectedNativeHost=null;let nativePermission=false;let nativeMessages=[];let registered=[];
+let stored=[];let aiSitesStored=[];let localToolSitesStored=[];let selectedNativeHost=null;let nativePermission=false;let nativeMessages=[];let registered=[];
 const id='chrome-test-extension';
 const popupUrl=`chrome-extension://${id}/popup.html`;
 globalThis.chrome={
@@ -13,10 +13,14 @@ globalThis.chrome={
     onInstalled:{addListener(fn){listeners.installed=fn;}},
     onStartup:{addListener(fn){listeners.startup=fn;}},
     async sendNativeMessage(host,request){nativeMessages.push({host,request});return {
-      protocol_version:1,request_id:request.request_id,ok:true,
+      protocol_version:request.protocol_version,request_id:request.request_id,ok:true,
       result: request.action==='host.status'
-        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run']}
-        : request.action==='context.summarize'
+        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run','web.v2.capabilities','web.v2.mcp.status']}
+        : request.action==='web.v2.capabilities'
+          ? {origin:request.payload.origin,mcp_status_grants:[]}
+          : request.action==='web.v2.mcp.status'
+            ? {provider:'wechat',tool:'wechat_status',ok:true,bridge_task_created:false}
+          : request.action==='context.summarize'
           ? {status:'completed',summary:'A brief summary.'}
           : request.action==='enterprise.pi.run'
             ? {status:'completed',result:'MOCK_ENTERPRISE_OK'}
@@ -25,10 +29,11 @@ globalThis.chrome={
             : {received:true,forwarded:false}};}
   },
   storage:{local:{
-    async get(){return {trustedSites:stored,enterpriseAiSites:aiSitesStored,nativeHost:selectedNativeHost};},
+    async get(){return {trustedSites:stored,enterpriseAiSites:aiSitesStored,localToolSites:localToolSitesStored,nativeHost:selectedNativeHost};},
     async set(x){
       if ('trustedSites' in x) stored=x.trustedSites;
       if ('enterpriseAiSites' in x) aiSitesStored=x.enterpriseAiSites;
+      if ('localToolSites' in x) localToolSitesStored=x.localToolSites;
       if ('nativeHost' in x) selectedNativeHost=x.nativeHost;
     }
   }},
@@ -176,5 +181,33 @@ test('enterprise Pi requires separate local AI grant, original signed ticket and
     'rate_limited');
   assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:false},popup)).ok,true);
   assert.equal((await send({type:'GET_SITE',origin:site},popup)).ai_enabled,false);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,'site_not_allowed');
+});
+
+test('V2 MCP status requires separate exact-site permission and native version 2',async()=>{
+  nativePermission=true;
+  const req={channel:'local-tool-bridge:web:v2',type:'REQUEST',version:2,
+    requestId:'web_v2_1',action:'mcp.status',params:{provider:'wechat',tool:'wechat_status'}};
+  assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup)).ok,true);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,
+    'site_mcp_permission_required');
+  assert.equal((await send({type:'SITE_TOOLS_TOGGLE',origin:site,enabled:true},trustedPage)).code,
+    'caller_not_allowed');
+  assert.equal((await send({type:'SITE_TOOLS_TOGGLE',origin:site,enabled:true},popup)).ok,true);
+  assert.equal((await send({type:'GET_SITE',origin:site},popup)).tools_enabled,true);
+  const response=await send({type:'WEB_REQUEST',request:req},trustedPage);
+  assert.equal(response.ok,true);
+  assert.equal(response.result.provider,'wechat');
+  assert.equal(nativeMessages.at(-1).request.protocol_version,2);
+  assert.equal(nativeMessages.at(-1).request.action,'web.v2.mcp.status');
+  assert.equal(nativeMessages.at(-1).request.payload.origin,site);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},untrustedPage)).code,'site_not_allowed');
+  assert.equal((await send({type:'WEB_REQUEST',request:req},{...trustedPage,frameId:1})).code,
+    'site_not_allowed');
+  const unsafe={...req,requestId:'web_v2_2',params:{provider:'wechat',tool:'wechat_send_message'}};
+  assert.equal((await send({type:'WEB_REQUEST',request:unsafe},trustedPage)).code,
+    'unsupported_v2_action');
+  assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:false},popup)).ok,true);
+  assert.equal((await send({type:'GET_SITE',origin:site},popup)).tools_enabled,false);
   assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,'site_not_allowed');
 });

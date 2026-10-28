@@ -80,6 +80,8 @@
       <p id="siteHint" class="hint">Basic site permission allows read-only discovery only.</p>
       <button id="siteAi" class="wide" disabled>Enable this site's enterprise AI → local Pi</button>
       <p id="siteAiHint" class="hint">Separate one-time permission. Only this exact site can request text-only Pi tasks using its own backend and short-lived authorization. No personal model API setup; local tools stay disabled.</p>
+      <button id="siteTools" class="wide" disabled>Enable this site's local MCP status</button>
+      <p id="siteToolsHint" class="hint">V2: separately authorize status-only MCP on this origin. Each provider/tool must also be granted by the local user CLI. No chat reads, sends, file writes, or arbitrary Agent runs.</p>
     </section>
     <p id="status" role="status" aria-live="polite">Ready. No data has been sent.</p>
     <footer>

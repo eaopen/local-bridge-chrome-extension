@@ -1,3 +1,11 @@
+## v0.6.0 — experimental Web V2 MCP status, separate grants
+
+- Add separately versioned `local-tool-bridge:web:v2` requests for `local.capabilities` and `mcp.status`; keep old V1 browser/Native Messaging actions untouched.
+- Only exact top-level origins explicitly approved for local MCP may call V2; the OS user must separately grant one installed provider and a **status-only** tool in Local Bridge CLI. No generic tools/call, Agent run, chat read/send, shell or file write.
+- Use existing independent Native Host with explicit `protocol_version=2` dispatch. No CloudFile Native Host or file workflow changes.
+- Add origin/permission and schema tests; source tests do **not** claim real Chrome GUI, corporate SSO or installed MCP Provider execution has passed.
+- The new feature is a cross-project preview; `eaopen/local-bridge` compatible branch and user's optional Provider are required for a completed status query. Users without Bridge keep existing Capture/Copy/Save and Web AI Relay.
+
 ## v0.5.0 — enterprise Web → local Pi (code, not Store approval)
 
 - Separate one-time exact-origin grant for an enterprise website to invoke a scoped text-only Pi task.
