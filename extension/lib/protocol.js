@@ -8,6 +8,7 @@ export const MAX_SELECTION = 16000;
 export const MAX_TITLE = 300;
 export const MAX_SHARE_BYTES = 64 * 1024;
 export const MAX_REQUEST_ID = 80;
+export const MAX_ENTERPRISE_PROMPT_BYTES = 32 * 1024;
 
 // This is a Chrome Native Messaging host identifier, never an EXE or URL.
 // It is selected by the local extension user, not a web page or model prompt.
@@ -67,9 +68,9 @@ export function formatContext(context) {
 
 export function nativeRequest(action, payload = {}, requestId) {
   if (!validRequestId(requestId)) throw new Error('Invalid request id');
-  if (!['host.status', 'context.share', 'context.summarize', 'relay.return'].includes(action)) throw new Error('Unsupported native action');
+  if (!['host.status', 'context.share', 'context.summarize', 'relay.return', 'enterprise.pi.run'].includes(action)) throw new Error('Unsupported native action');
   if (!payload || Array.isArray(payload) || typeof payload !== 'object') throw new Error('Invalid payload');
-  if (action === 'context.share' || action === 'context.summarize' || action === 'relay.return') {
+  if (action === 'context.share' || action === 'context.summarize' || action === 'relay.return' || action === 'enterprise.pi.run') {
     const s = JSON.stringify(payload);
     if (new TextEncoder().encode(s).length > MAX_SHARE_BYTES) throw new Error('Share too large');
   } else if (Object.keys(payload).length) {
@@ -86,13 +87,34 @@ export function parseNativeResponse(message, requestId) {
   return { ok: true, result: message.result || {} };
 }
 
+// The service worker still validates Chrome-reported sender origin and a
+// *separate* user-enabled AI grant before this ever reaches a local program.
+export function validEnterprisePiParams(p) {
+  if (!p || typeof p !== 'object' || Array.isArray(p) ||
+      Object.keys(p).length !== 4 ||
+      !['api_path','model','ticket','prompt'].every(k => Object.hasOwn(p,k))) return false;
+  if (typeof p.api_path !== 'string' || p.api_path.length < 2 ||
+      p.api_path.length > 128 || !/^\/[a-zA-Z0-9/_-]+$/.test(p.api_path) ||
+      p.api_path.startsWith('//') || p.api_path.includes('..')) return false;
+  if (typeof p.model !== 'string' || p.model.length > 128 ||
+      !/^[a-zA-Z0-9_][a-zA-Z0-9_./-]*$/.test(p.model) || p.model.includes('..')) return false;
+  if (typeof p.ticket !== 'string' || p.ticket.length > 8192 ||
+      !/^[\x21-\x7e]+$/.test(p.ticket)) return false;
+  if (typeof p.prompt !== 'string' || !p.prompt.trim() ||
+      new TextEncoder().encode(p.prompt).length > MAX_ENTERPRISE_PROMPT_BYTES) return false;
+  return true;
+}
+
 export function validWebRequest(message) {
-  return Boolean(message && typeof message === 'object' && !Array.isArray(message) &&
-    message.channel === WEB_CHANNEL && message.type === 'REQUEST' &&
-    message.version === VERSION && validRequestId(message.requestId) &&
-    ['extension.status', 'native.status'].includes(message.action) &&
-    Object.keys(message).every(k => ['channel', 'type', 'version', 'requestId', 'action', 'params'].includes(k)) &&
+  if (!message || typeof message !== 'object' || Array.isArray(message) ||
+      message.channel !== WEB_CHANNEL || message.type !== 'REQUEST' ||
+      message.version !== VERSION || !validRequestId(message.requestId) ||
+      !Object.keys(message).every(k => ['channel', 'type', 'version', 'requestId', 'action', 'params'].includes(k))) return false;
+  if (message.action === 'enterprise.pi.run') {
+    return validEnterprisePiParams(message.params);
+  }
+  return ['extension.status', 'native.status'].includes(message.action) &&
     (message.params === undefined ||
       (message.params && typeof message.params === 'object' && !Array.isArray(message.params) &&
-       Object.keys(message.params).length === 0)));
+       Object.keys(message.params).length === 0));
 }

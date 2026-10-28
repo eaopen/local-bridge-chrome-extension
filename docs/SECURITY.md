@@ -20,3 +20,9 @@ The optional `context.summarize` is available **only** via the trusted extension
 ## Manual Web AI Relay
 
 Only the popup can copy/open a chosen chat and submit a reviewed `relay.return` request. An approved Web page retains **read-only status queries**, never model/API forwarding or tool invocation. The selected prompt is not automatically sent to the remote chat: the human must paste it. The extension stores one small local source/task descriptor but no prompt or AI transcript. A returned model suggestion is untrusted text, never authority to run local commands, change files, or send messages. No scraping of private Web Chat DOM, tokens or usage limits. No installed Provider is required.
+
+## Separately approved enterprise Web AI
+
+`enterprise.pi.run` is not covered by the basic read-only website allowlist. A second user-granted exact-origin list is required, together with Chrome Native Messaging permission and an installed Host. The Chrome Service Worker derives the origin from its trusted `sender.origin`, enforces top frame, exact origin, schema limits, no URL command path or external endpoint, and limits concurrent calls. Disabling the original site also revokes its local-AI grant.
+
+Only the **same-origin** enterprise backend can supply the model API and a short-lived scoped ticket; the original server remains responsible for SSO, per-user access, model permission, request budget, and auditing. The Host checks the endpoint and does not store the ticket, access browser cookies or use generic shell/file tools. These are powerful privileges: grant only enterprise sites you trust. Do not claim that ordinary third-party Web chat sites can transparently supply a Pi model through their consumer Web sessions.

@@ -1,3 +1,10 @@
+## v0.5.0 — enterprise Web → local Pi (code, not Store approval)
+
+- Separate one-time exact-origin grant for an enterprise website to invoke a scoped text-only Pi task.
+- Enterprise service supplies compatible model endpoint, short-lived ticket and authorization; no personal Pi API setup.
+- Status-only site permissions remain read-only; same-origin path/ticket and the site source are checked before executing. No local file/shell tools, free Web Chat scraping or model gateway.
+- CI/Node tests verify the browser contract; real enterprise SSO and Chrome GUI/Host integration still need acceptance.
+
 ## v0.4.0 — manual Web AI Relay (code, not Store approval)
 
 - User-driven Copy task + open Web AI, supported destinations and optional custom HTTPS chat site.

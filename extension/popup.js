@@ -6,6 +6,7 @@ const $ = id => document.getElementById(id);
 let context = { url: '', title: '', selection: '' };
 let origin = null;
 let enabled = false;
+let aiEnabled = false;
 let tabId = null;
 let pendingRelay = null;
 const notify = message => { $('status').textContent = message; };
@@ -25,13 +26,19 @@ async function refreshSite() {
   if (!tab || !isPage(tab.url)) {
     origin = null;
     $('site').disabled = true;
+    $('siteAi').disabled = true;
     $('siteHint').textContent = 'This Chrome page cannot enable website integration.';
     return;
   }
   origin = new URL(tab.url).origin;
   const result = await bridgeMessage({ type: 'GET_SITE', origin });
   enabled = Boolean(result?.allowed);
+  aiEnabled = Boolean(result?.ai_enabled);
   $('site').disabled = false;
+  $('siteAi').disabled = false;
+  $('siteAi').textContent = aiEnabled
+    ? 'Disable this site\'s enterprise AI'
+    : 'Enable this site\'s enterprise AI → local Pi';
   $('site').textContent = enabled ? 'Disable this site' : 'Allow this site';
   $('siteHint').textContent = `${origin} · ${enabled ? 'Read-only discovery enabled' : 'Not enabled'}`;
 }
@@ -282,6 +289,8 @@ $('site').addEventListener('click', async () => {
   if (!reply?.ok) return notify(`Unable to update website permission (${reply?.code || 'unknown'}).`);
   enabled = next;
   if (!next) {
+    aiEnabled = false;
+    $('siteAi').textContent = 'Enable this site\'s enterprise AI → local Pi';
     const data = await chrome.storage.local.get('trustedSites');
     const remaining = Array.isArray(data.trustedSites) ? data.trustedSites : [];
     if (!remaining.some(x => hostMatch(x) === pattern)) {
@@ -295,6 +304,27 @@ $('site').addEventListener('click', async () => {
   $('site').textContent = enabled ? 'Disable this site' : 'Allow this site';
   $('siteHint').textContent = `${origin} · ${enabled ? 'Read-only discovery enabled' : 'Not enabled'}`;
   notify(enabled ? 'Only read-only availability is exposed to this site.' : 'Site integration disabled.');
+});
+$('siteAi').addEventListener('click', async () => {
+  if (!origin) return;
+  const next = !aiEnabled;
+  if (next && !enabled) {
+    return notify('Allow this site first. Basic site permission stays read-only.');
+  }
+  if (next && !await requestNative()) {
+    return notify('Native Messaging permission is needed for enterprise Pi tasks.');
+  }
+  const reply = await bridgeMessage({type:'SITE_AI_TOGGLE',origin,enabled:next});
+  if (!reply?.ok) {
+    return notify(`Enterprise AI permission unchanged (${reply?.code || 'unknown'}).`);
+  }
+  aiEnabled = next;
+  $('siteAi').textContent = next
+    ? 'Disable this site\'s enterprise AI'
+    : 'Enable this site\'s enterprise AI → local Pi';
+  notify(next
+    ? 'This site may call Pi with its own authenticated enterprise AI ticket. No local file tools.'
+    : 'Local enterprise AI permission revoked for this site.');
 });
 $('hostSave').addEventListener('click', async () => {
   const value = $('hostName').value.trim();

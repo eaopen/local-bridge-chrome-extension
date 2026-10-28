@@ -6,6 +6,12 @@
 
 **Single purpose:** explicitly transfer user-reviewed context from the current page to user-chosen local tools. No passive browsing capture, remote scripts, analytics, cookie access, browser identity management, or general-purpose command execution.
 
+## v0.5.0 — enterprise Web → local Pi without personal model setup
+
+An existing enterprise Web app can use its **own server-provided AI API** as the model source for a locally installed Pi Agent. After the user separately enables **enterprise AI** for the exact website origin, the already-logged-in app obtains a short-lived model ticket from its own backend and invokes one bounded, text-only `enterprise.pi.run` operation through this Chrome extension and an optional Local Bridge Native Host. No personal Pi API key, new model routing account, arbitrary website executable or file-access tool is required. The scoped ticket is used in-flight only; no browser cookies or permanent credentials are collected.
+
+This requires the enterprise app to implement the documented compatible streaming endpoint and scoped ticket. A granted status-only website permission is **not** an AI execution grant. The feature is code-complete as an optional integration contract; actual Chrome GUI + enterprise SSO server E2E remains to be tested. Other existing Copy/Save, Local Bridge and manual Web AI Relay behavior remains independent. See [Enterprise Web-to-Pi contract](docs/ENTERPRISE_PI_WEB.md).
+
 ## v0.4.0 — lightweight Web AI Relay (manual fallback)
 
 **Not a 9Router alternative.** Use ChatGPT, Gemini, Claude, Copilot, DeepSeek or a custom HTTPS chat site when an installed local Agent is unavailable or its quota is exhausted. The user chooses reviewed page/task content, clicks **Copy task & open Web AI**, pastes the prepared prompt into their existing browser chat and then manually brings a selected answer back.
@@ -42,7 +48,7 @@ npm run build
 # Chrome → chrome://extensions → Developer mode → Load unpacked → choose extension/
 ```
 
-The plugin itself has **no runtime npm dependencies**. Node 20+ is only needed to run tests and create the reproducible store ZIP; `npm run build` produces `dist/local-tool-bridge-v0.4.0.zip` containing only deployable extension assets.
+The plugin itself has **no runtime npm dependencies**. Node 20+ is only needed to run tests and create the reproducible store ZIP; `npm run build` produces `dist/local-tool-bridge-v0.5.0.zip` containing only deployable extension assets.
 
 ### Without a provider
 
@@ -54,7 +60,7 @@ Select any text on an ordinary HTTP(S) page, click the extension icon → **Capt
 2. The host installer must register the host for your OS user, pin **this extension's actual published ID** in `allowed_origins`, and validate the protocol. The default host is `com.eaopen.browser_bridge`. Advanced users can explicitly select another valid installed host name in the popup.
 3. In the popup, review your content and click **Send to provider**. Click **Summarize with local AI** only if you want the selected provider to process that text (Chrome asks for optional nativeMessaging permission as needed). The extension checks that the host advertises `context.summarize` before sending the request. A reference host that only acknowledges receipt does **not** constitute successful local AI or CloudFile processing.
 
-This v0.3.0 extension does **not** ship or register a native host. Local Bridge independently implements `com.eaopen.browser_bridge` with user-level installation and the optional summary capability, but a separately installed third-party host can implement the same typed action. Integration is tracked at [Local Bridge #9](https://github.com/eaopen/local-bridge/issues/9). The extension does not need Local Bridge for its independent page-note features.
+This v0.5.0 extension does **not** ship or register a native host. Local Bridge independently implements `com.eaopen.browser_bridge` with user-level installation and the optional summary capability, but a separately installed third-party host can implement the same typed action. Integration is tracked at [Local Bridge #9](https://github.com/eaopen/local-bridge/issues/9). The extension does not need Local Bridge for its independent page-note features.
 
 ## Existing CloudFile users
 
@@ -70,4 +76,4 @@ No change is made to the current [CloudFile Chrome Extension](https://github.com
 
 See [privacy policy draft](docs/PRIVACY_POLICY.md), [store release checklist](docs/STORE_RELEASE.md), [security](docs/SECURITY.md), and [development instructions](docs/DEVELOPMENT.md).
 
-Apache-2.0. **No claim that v0.4.0 is approved/published in Chrome Web Store.**
+Apache-2.0. **No claim that v0.5.0 is approved/published in Chrome Web Store.**

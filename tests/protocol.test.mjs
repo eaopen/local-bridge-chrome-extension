@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validRequestId, validatedOrigin, hostMatch, sanitizePage, formatContext,
-  nativeRequest, parseNativeResponse, validWebRequest, validateHostName, WEB_CHANNEL} from '../extension/lib/protocol.js';
+  nativeRequest, parseNativeResponse, validWebRequest, validEnterprisePiParams, validateHostName, WEB_CHANNEL} from '../extension/lib/protocol.js';
 
 test('page context sanitization is bounded and strips query, fragment and credentials', () => {
   const c=sanitizePage({url:'https://user:password@example.com/folder/?token=secret#part',
@@ -51,4 +51,26 @@ test('user-configured native host name must be an installed-host identifier, not
   for (const name of ['com', 'HTTP://localhost', 'org.example;rm', '../bin/sh',
     'Com.UPPER.host', 'com.example..host', '.host', 'com.example/other', ''])
     assert.equal(validateHostName(name), false, name);
+});
+
+test('enterprise Pi Web request allows only a bounded same-origin endpoint path and typed ticket',()=>{
+  const p={api_path:'/api/ai/v1',model:'team-chat',ticket:'short-lived-ticket',
+    prompt:'A synthetic text-only task'};
+  assert.equal(validEnterprisePiParams(p),true);
+  const base={channel:WEB_CHANNEL,type:'REQUEST',version:1,
+    requestId:'enterprise_2',action:'enterprise.pi.run',params:p};
+  assert.equal(validWebRequest(base),true);
+  for(const bad of [
+    {...p,api_path:'https://evil.example.org/v1'},
+    {...p,api_path:'//evil.example.org/v1'},
+    {...p,api_path:'/api/../evil'},
+    {...p,api_path:'/api/v1?token=secret'},
+    {...p,model:'--unsafe'},
+    {...p,ticket:'bad\nheader'},
+    {...p,ticket:''},
+    {...p,prompt:'  '},
+    {...p,prompt:'x'.repeat(35_000)},
+    {...p,command:'rm'},
+  ]) assert.equal(validWebRequest({...base,params:bad}),false);
+  assert.equal(validWebRequest({...base,action:'shell.run'}),false);
 });

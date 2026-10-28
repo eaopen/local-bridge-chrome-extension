@@ -46,3 +46,11 @@ A generic typed request/response API is intentional; no `externally_connectable:
 - Local Bridge and CloudFile file tasks remain owned by their existing code; task `accepted` is not file `completed` or message `delivered`.
 
 See [V1 protocol](PROTOCOL_V1.md), [privacy](PRIVACY_POLICY.md), [security](SECURITY.md), and [store release](STORE_RELEASE.md).
+
+## Enterprise Web → local Pi (additional typed capability)
+
+A user may separately allow `enterprise.pi.run` for one exact enterprise origin in the popup. This is **not** included in the existing read-only site discovery grant. The web app must use its already logged-in session to obtain from its **own backend** a short-lived, scoped `ticket`, `model` and same-origin `api_path`, then issue a typed request through the existing Content Script → Service Worker path. Background validates the actual Chrome sender origin and permission, constructs the Native Messaging request itself and returns the confirmed model result to the originating same-origin page.
+
+The Native Host independently rejects cross-origin API paths, insecure origins, invalid IDs/tickets and oversized prompts, then invokes Pi with an ephemeral `models.json` and no local file/shell tools. Enterprise server owns the authentication, the OpenAI-compatible streaming endpoint, quota and billing. There is **no** enterprise API Key UI, second model router, user Pi model setup or secret persisted in extension settings. Native Host installation and one-time capability permission are explicit prerequisites.
+
+Without an authorized enterprise server, the feature returns unavailable and the site's existing functionality is not affected. The separate Web AI Relay remains human-mediated and does not convert a ChatGPT/Gemini web session to unattended Pi inference. Full Chrome/SSO E2E has not yet been accepted; source-level tests do not replace it. See [contract](ENTERPRISE_PI_WEB.md).
