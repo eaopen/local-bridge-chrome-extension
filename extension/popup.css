@@ -37,3 +37,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,summary:focus-vi
 #summaryBox[hidden]{display:none}
 #summaryText{background:#fff;white-space:pre-wrap}
 #summaryCopy{margin-top:7px}
+
+select{width:100%;background:#fcfdff;color:inherit;border:1px solid #c8d3e1;border-radius:8px;font:inherit;padding:8px;margin:6px 0 4px}
+#relayPanel[open]{display:block}
+#relayPanel summary{font-size:12px;letter-spacing:.025em}
+#relayCustomWrap[hidden]{display:none}
+.subtle-action{margin-top:8px}

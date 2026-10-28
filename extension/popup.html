@@ -25,6 +25,37 @@
       <p class="hint">The text stays here until you explicitly copy, save or send it.</p>
     </section>
     <section>
+      <details id="relayPanel">
+        <summary>WEB AI RELAY · Manual fallback</summary>
+        <p class="hint">Use your existing web chat when a local Agent is unavailable or out of quota. You copy and paste the task yourself; nothing is submitted automatically.</p>
+        <label class="field-label" for="relayTarget">Open Web AI</label>
+        <select id="relayTarget">
+          <option value="chatgpt">ChatGPT</option>
+          <option value="gemini">Gemini</option>
+          <option value="claude">Claude</option>
+          <option value="copilot">Copilot</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="custom">Other HTTPS chat...</option>
+        </select>
+        <div id="relayCustomWrap" hidden>
+          <label class="field-label" for="relayCustomUrl">HTTPS chat URL</label>
+          <input id="relayCustomUrl" type="url" spellcheck="false" placeholder="https://example.ai/chat">
+        </div>
+        <label class="field-label" for="relayTaskRef">Local task reference (optional)</label>
+        <input id="relayTaskRef" type="text" maxlength="96" spellcheck="false" placeholder="ctx-...">
+        <button id="relayStart" class="wide primary">Copy task &amp; open Web AI</button>
+        <button id="relayAttach" class="wide subtle-action">Link existing local task (return only)</button>
+        <p class="hint">Paste the copied task into your existing web chat. The website's own login and usage limits still apply.</p>
+        <p id="relayPending" class="meta">No task waiting for a reply.</p>
+        <label class="field-label" for="relayReply">Reply to bring back (review first)</label>
+        <textarea id="relayReply" rows="5" maxlength="16000" spellcheck="false" placeholder="Paste the Web AI reply, or select it on the page and click Use selected reply."></textarea>
+        <button id="relayCapture" class="wide">Use selected reply from this tab</button>
+        <div class="actions"><button id="relayCopy">Copy return package</button><button id="relayReturn" class="primary">Return to local provider</button></div>
+        <button id="relayClear" class="wide subtle-action">Forget relay link</button>
+        <p class="hint">No auto chat reading, auto submission or MCP execution. Local Bridge is optional; without it, Copy return package works.</p>
+      </details>
+    </section>
+    <section>
       <div class="eyebrow">OPTIONAL LOCAL CONNECTION</div>
       <div class="actions"><button id="native">Check provider</button><button id="share" class="primary">Send to provider</button></div>
       <button id="summarize" class="wide summary-action">Summarize with local AI (optional)</button>

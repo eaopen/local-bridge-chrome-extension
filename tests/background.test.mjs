@@ -15,10 +15,12 @@ globalThis.chrome={
     async sendNativeMessage(host,request){nativeMessages.push({host,request});return {
       protocol_version:1,request_id:request.request_id,ok:true,
       result: request.action==='host.status'
-        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize']}
+        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return']}
         : request.action==='context.summarize'
           ? {status:'completed',summary:'A brief summary.'}
-          : {received:true,forwarded:false}};}
+          : request.action==='relay.return'
+            ? {stored:true,status:'received',task_id:'ctx-returned12345'}
+            : {received:true,forwarded:false}};}
   },
   storage:{local:{async get(){return {trustedSites:stored,nativeHost:selectedNativeHost};},async set(x){if ('trustedSites' in x) stored=x.trustedSites;if ('nativeHost' in x) selectedNativeHost=x.nativeHost;}}},
   permissions:{async contains(q){return q.permissions ? nativePermission : granted.has(q.origins[0]);},
@@ -37,6 +39,7 @@ test('website cannot activate itself or share content',async()=>{
   assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:true},trustedPage)).code,'caller_not_allowed');
   assert.equal((await send({type:'SHARE_CONTEXT',context:{title:'x',url:'a',selection:'s'}},trustedPage)).code,'caller_not_allowed');
   assert.equal((await send({type:'SUMMARIZE_CONTEXT',context:{title:'x',url:'a',selection:'s'}},trustedPage)).code,'caller_not_allowed');
+  assert.equal((await send({type:'RELAY_RETURN',pending:{},reply:{}},trustedPage)).code,'caller_not_allowed');
 });
 test('popup permission enables EXACT origin, refuses other origin/frame',async()=>{
   const r=await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup);
@@ -102,4 +105,28 @@ test('only popup can explicitly summarize, via capability-checked native host',a
   assert.equal(nativeMessages.at(-1).request.action,'context.summarize');
   assert.equal((await send({type:'SUMMARIZE_CONTEXT',context:ctx},trustedPage)).code,'caller_not_allowed');
   assert.equal((await send({type:'SUMMARIZE_CONTEXT',context:{...ctx,selection:' '}},popup)).code,'invalid_context');
+});
+
+test('user-reviewed Web AI return is popup-only and retains task reference',async()=>{
+  nativePermission=true;
+  const pending={
+    relay_id:'rel-0123456789abcdef0123456789abcdef',
+    web_ai:'chatgpt',
+    task_ref:'ctx-123456789abc',
+    created_at:Date.now(),
+    source:{title:'Source',url:'https://example.test/context'}
+  };
+  const reply={title:'ChatGPT',url:'https://chatgpt.com/c/123?token=secret#scroll',selection:'Proposed fix; not executed.'};
+  const returned=await send({type:'RELAY_RETURN',pending,reply},popup);
+  assert.equal(returned.ok,true);
+  assert.equal(returned.result.status,'received');
+  assert.equal(returned.result.stored,true);
+  assert.equal(nativeMessages.at(-2).request.action,'host.status');
+  assert.equal(nativeMessages.at(-1).request.action,'relay.return');
+  const wire=nativeMessages.at(-1).request.payload;
+  assert.equal(wire.task_ref,'ctx-123456789abc');
+  assert.equal(wire.reply.url,'https://chatgpt.com/c/123');
+  assert.equal(wire.reply.selection,'Proposed fix; not executed.');
+  assert.equal((await send({type:'RELAY_RETURN',pending,reply},trustedPage)).code,'caller_not_allowed');
+  assert.equal((await send({type:'RELAY_RETURN',pending,reply:{...reply,selection:' '}},popup)).code,'invalid_relay');
 });

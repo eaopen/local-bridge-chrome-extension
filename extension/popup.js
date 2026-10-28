@@ -1,10 +1,13 @@
 import { hostMatch, sanitizePage, formatContext, validateHostName, HOST_NAME, MAX_SELECTION } from './lib/protocol.js';
+import { createPendingRelay, relayReturnPayload, relayReturnText,
+  validatePendingRelay, webAiPrompt, webAiUrl } from './lib/web-ai-relay.js';
 
 const $ = id => document.getElementById(id);
 let context = { url: '', title: '', selection: '' };
 let origin = null;
 let enabled = false;
 let tabId = null;
+let pendingRelay = null;
 const notify = message => { $('status').textContent = message; };
 const bridgeMessage = message => chrome.runtime.sendMessage(message);
 
@@ -133,6 +136,140 @@ $('summaryCopy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(summary); notify('Summary copied.'); }
   catch { notify('Clipboard unavailable. Select the summary text to copy.'); }
 });
+function describePending() {
+  const label = $('relayPending');
+  if (!pendingRelay) {
+    label.textContent = 'No task waiting for a reply.';
+  } else {
+    label.textContent = `Active handoff: ${pendingRelay.web_ai} · ${pendingRelay.task_ref || pendingRelay.relay_id} · ${pendingRelay.source.title || 'Selected text'}`;
+  }
+  for (const id of ['relayCopy', 'relayReturn', 'relayCapture', 'relayClear']) {
+    $(id).disabled = !pendingRelay;
+  }
+}
+
+function currentRelayReply(text) {
+  const reply = {title:'', url:'', selection:text};
+  return chrome.tabs.query({active:true,currentWindow:true}).then(tabs => {
+    const tab = tabs[0];
+    if (tab && isPage(tab.url)) {
+      reply.title = tab.title || '';
+      reply.url = tab.url || '';
+    }
+    return sanitizePage(reply);
+  });
+}
+$('relayTarget').addEventListener('change', () => {
+  $('relayCustomWrap').hidden = $('relayTarget').value !== 'custom';
+});
+$('relayStart').addEventListener('click', async () => {
+  const selected = editableContext();
+  const taskRef = $('relayTaskRef').value.trim();
+  let prompt, destination, pending;
+  try {
+    destination = webAiUrl($('relayTarget').value, $('relayCustomUrl').value);
+    prompt = webAiPrompt(selected, taskRef);
+    pending = createPendingRelay(
+      selected, $('relayTarget').value, taskRef,
+      'rel-' + crypto.randomUUID().replaceAll('-', ''), Date.now()
+    );
+  } catch (error) {
+    return notify(error.message);
+  }
+  try {
+    // No service receives the prompt until the USER pastes it into Web Chat.
+    await navigator.clipboard.writeText(prompt);
+  } catch {
+    return notify('Cannot copy the task. Check clipboard permission before opening Web AI.');
+  }
+  try {
+    await chrome.storage.local.set({pendingRelay:pending});
+    pendingRelay = pending;
+    describePending();
+    await chrome.tabs.create({url:destination,active:true});
+  } catch {
+    notify('Task copied; could not open Web AI. You can paste into a chat yourself.');
+  }
+});
+$('relayAttach').addEventListener('click', async () => {
+  const taskRef = $('relayTaskRef').value.trim();
+  if (!taskRef) return notify('Enter an existing local task reference first.');
+  try {
+    const pending = createPendingRelay(
+      {title:'Local Bridge task',url:'',selection:'Manual return-only task link'},
+      $('relayTarget').value,taskRef,
+      'rel-' + crypto.randomUUID().replaceAll('-', ''),Date.now()
+    );
+    await chrome.storage.local.set({pendingRelay:pending});
+    pendingRelay = pending;
+    describePending();
+    notify('Local task linked. Paste a Web AI reply below to return it.');
+  } catch(error) {
+    notify(error.message || 'Could not link task');
+  }
+});
+$('relayCapture').addEventListener('click', async () => {
+  if (!pendingRelay) return notify('Start or restore a relay first.');
+  try {
+    const tab = (await chrome.tabs.query({active:true,currentWindow:true}))[0];
+    if (!tab?.id || !isPage(tab.url)) return notify('Select text on a normal web page.');
+    const selection = await chrome.scripting.executeScript({
+      target:{tabId:tab.id},
+      func:() => window.getSelection()?.toString().slice(0,16001) || ''
+    });
+    const text = selection?.[0]?.result || '';
+    if (!text.trim()) return notify('No selected text found. Copy the reply and paste it below.');
+    if (text.length > MAX_SELECTION) return notify('Reply is too long. Select a shorter excerpt.');
+    $('relayReply').value = text;
+    notify('Selected reply captured. Review before returning it.');
+  } catch {
+    notify('Cannot access selected text here. Copy and paste the reply manually.');
+  }
+});
+$('relayCopy').addEventListener('click', async () => {
+  if (!pendingRelay) return notify('Start or restore a relay first.');
+  try {
+    const reply = await currentRelayReply($('relayReply').value);
+    await navigator.clipboard.writeText(relayReturnText(pendingRelay, reply));
+    notify('Return package copied. Paste it into any local tool.');
+  } catch(error) {
+    notify(error.message || 'Cannot copy the return package.');
+  }
+});
+$('relayReturn').addEventListener('click', async () => {
+  if (!pendingRelay) return notify('Start or restore a relay first.');
+  let reply;
+  try {
+    reply = await currentRelayReply($('relayReply').value);
+    relayReturnPayload(pendingRelay, reply);
+  } catch(error) {
+    return notify(error.message || 'Select or paste a reply first.');
+  }
+  if (!await requestNative()) return notify('Native permission not granted. Use Copy return package instead.');
+  $('relayReturn').disabled = true;
+  try {
+    const received = await bridgeMessage({type:'RELAY_RETURN',pending:pendingRelay,reply});
+    if (!received?.ok) {
+      return notify(`Return was not confirmed (${received?.code || received?.error || 'unknown'}). Check the local inbox before retrying; Copy is available.`);
+    }
+    if (received.result?.stored !== true || received.result?.status !== 'received') {
+      return notify('The local provider did not confirm storage. Do not assume task completion.');
+    }
+    notify(`Reply stored locally as ${received.result.task_id}. No code or MCP tool was executed.`);
+  } catch {
+    notify('Return status unknown. Inspect the local inbox before trying again.');
+  } finally {
+    $('relayReturn').disabled = false;
+  }
+});
+$('relayClear').addEventListener('click', async () => {
+  await chrome.storage.local.remove('pendingRelay');
+  pendingRelay = null;
+  $('relayReply').value = '';
+  describePending();
+  notify('Local relay link cleared. Provider inbox items are unaffected.');
+});
+
 $('site').addEventListener('click', async () => {
   if (!origin) return;
   const next = !enabled;
@@ -169,10 +306,21 @@ $('hostSave').addEventListener('click', async () => {
 });
 (async () => {
   $('hostName').value = HOST_NAME;
+  describePending();
   try {
-    const [host] = await Promise.all([
-      bridgeMessage({ type: 'HOST_GET' }), refreshSite()
+    const [host, relay] = await Promise.all([
+      bridgeMessage({ type: 'HOST_GET' }),
+      chrome.storage.local.get('pendingRelay'),
+      refreshSite()
     ]);
     if (validateHostName(host?.host)) $('hostName').value = host.host;
+    if (relay?.pendingRelay) {
+      try {
+        pendingRelay = validatePendingRelay(relay.pendingRelay);
+        $('relayTaskRef').value = pendingRelay.task_ref;
+        $('relayTarget').value = pendingRelay.web_ai;
+      } catch { /* corrupted or obsolete local metadata is not trusted */ }
+    }
+    describePending();
   } catch { notify('Extension is not fully available. Try reopening the popup.'); }
 })();

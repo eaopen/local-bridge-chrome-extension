@@ -6,6 +6,12 @@
 
 **Single purpose:** explicitly transfer user-reviewed context from the current page to user-chosen local tools. No passive browsing capture, remote scripts, analytics, cookie access, browser identity management, or general-purpose command execution.
 
+## v0.4.0 — lightweight Web AI Relay (manual fallback)
+
+**Not a 9Router alternative.** Use ChatGPT, Gemini, Claude, Copilot, DeepSeek or a custom HTTPS chat site when an installed local Agent is unavailable or its quota is exhausted. The user chooses reviewed page/task content, clicks **Copy task & open Web AI**, pastes the prepared prompt into their existing browser chat and then manually brings a selected answer back.
+
+With **no** Local Bridge, the reply can be copied as a source-labeled package to any tool. With an optional compatible Native Messaging host, **Return to local provider** stores the reviewed reply in the *existing* user-owned inbox with a link to the original task reference, never claiming an AI-generated code suggestion was executed. No extra account, API key, model gateway, automatic webpage scraping, free-quota scheduling or mandatory provider. The extension retains one lightweight local handoff descriptor, **not chat bodies**. See [Web AI Relay V1](docs/WEB_AI_RELAY.md).
+
 ## v0.3.0 — optional one-click local AI summary
 
 A user can now click **Summarize with local AI** on the content they selected/edited in the extension popup. The action is advertised only by compatible Native Messaging hosts (`context.summarize` capability); the Local Bridge implementation invokes the user's **existing Codex CLI** in ephemeral read-only mode and returns a summary to the popup. No host, no Codex or unsupported provider? Capture, edit, Copy and Save continue to work.
@@ -21,6 +27,7 @@ A user can now click **Summarize with local AI** on the content they selected/ed
 | Website read-only presence API | Yes | User enables individual sites; only `extension.status` and optional `native.status` |
 | Native provider status / handoff | Optional | `host.status` and `context.share`, request ID correlation, framed Chrome Native Messaging |
 | Summarize reviewed text in popup | Optional | Extra `context.summarize` capability; only user click, requires provider with installed/authorized AI CLI |
+| Manual Web AI Relay | Yes | Copy task, open existing Web AI, select/paste reply and copy a return package; optional `relay.return` Native Host stores task-linked reply |
 | Custom provider selection | Optional | User locally configures an installed host name in the popup; no website can change it |
 | Local Bridge onboarding | Yes | Optional official project link, standard host contract; no forced installation |
 | CloudFile local editing | Not yet | Current CloudFile extension remains production path; future migration requires actual file-mode E2E |
@@ -35,7 +42,7 @@ npm run build
 # Chrome → chrome://extensions → Developer mode → Load unpacked → choose extension/
 ```
 
-The plugin itself has **no runtime npm dependencies**. Node 20+ is only needed to run tests and create the reproducible store ZIP; `npm run build` produces `dist/local-tool-bridge-v0.3.0.zip` containing only deployable extension assets.
+The plugin itself has **no runtime npm dependencies**. Node 20+ is only needed to run tests and create the reproducible store ZIP; `npm run build` produces `dist/local-tool-bridge-v0.4.0.zip` containing only deployable extension assets.
 
 ### Without a provider
 
@@ -63,4 +70,4 @@ No change is made to the current [CloudFile Chrome Extension](https://github.com
 
 See [privacy policy draft](docs/PRIVACY_POLICY.md), [store release checklist](docs/STORE_RELEASE.md), [security](docs/SECURITY.md), and [development instructions](docs/DEVELOPMENT.md).
 
-Apache-2.0. **No claim that v0.3.0 is approved/published in Chrome Web Store.**
+Apache-2.0. **No claim that v0.4.0 is approved/published in Chrome Web Store.**

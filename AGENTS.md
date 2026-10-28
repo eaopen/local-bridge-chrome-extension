@@ -8,3 +8,5 @@
 6. Mark experimental/placeholder native integration honestly. Do not claim a reference host has executed a Local Bridge/Agent task.
 7. Prefer narrow tests and one true browser scenario; no overly broad abstraction or governance layers.
 8. The optional `context.summarize` path is **popup user-click only**, capability-gated, with a fixed typed payload. Approved webpages may never invoke AI/tools. Do not describe a locally installed CLI as inherently offline: its configured model could be remote.
+
+9. Web AI Relay is **manual clipboard/open/return**, not a chatbot integration or model gateway. Do not add Web Chat DOM scraping, auto-login, API/token extraction, auto-send, automatic MCP execution or 9Router-like quota routing. No Local Bridge/WeChat installation requirement; the optional `relay.return` only stores a user-reviewed reply linked to a source/task reference.
