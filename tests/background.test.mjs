@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 const site='https://example.test';
 const listeners={};const granted=new Set([`${site}/*`]);
-let stored=[];let aiSitesStored=[];let selectedNativeHost=null;let nativePermission=false;let nativeMessages=[];let registered=[];
+let stored=[];let aiSitesStored=[];let localToolSitesStored=[];let agentSitesStored=[];let selectedNativeHost=null;let nativePermission=false;let nativeMessages=[];let registered=[];
 const id='chrome-test-extension';
 const popupUrl=`chrome-extension://${id}/popup.html`;
 globalThis.chrome={
@@ -13,10 +13,27 @@ globalThis.chrome={
     onInstalled:{addListener(fn){listeners.installed=fn;}},
     onStartup:{addListener(fn){listeners.startup=fn;}},
     async sendNativeMessage(host,request){nativeMessages.push({host,request});return {
-      protocol_version:1,request_id:request.request_id,ok:true,
+      protocol_version:request.protocol_version,request_id:request.request_id,ok:true,
       result: request.action==='host.status'
-        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run']}
-        : request.action==='context.summarize'
+        ? {provider:'test-host',capabilities:['host.status','context.share','context.summarize','relay.return','enterprise.pi.run','web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.session.issue']}
+        : request.action==='web.v2.capabilities'
+          ? {origin:request.payload.origin,mcp_status_grants:[]}
+          : request.action==='web.v2.session.issue'
+            ? {endpoint:'http://127.0.0.1:48293',token:'a'.repeat(64),expires_in:600,
+               transport:'local-bridge-http-sse-v2'}
+          : request.action==='web.v2.agent.start'
+            ? {task_id:'wb-abcde-1234-0',status:'accepted',provider:'workbuddy'}
+          : request.action==='web.v2.agent.poll'
+            ? {task_id:request.payload.task_id,status:request.payload.cursor<2?'running':'completed',
+              terminal:request.payload.cursor>=2,
+              next_seq:request.payload.cursor===0?2:3,has_more:false,
+              events:request.payload.cursor===0
+                ? [{seq:1,type:'message.delta',message_id:'m1',text:'Part one'},
+                   {seq:2,type:'message.final',message_id:'m1'}]
+                : [{seq:3,type:'task.completed'}]}
+          : request.action==='web.v2.mcp.status'
+            ? {provider:'wechat',tool:'wechat_status',ok:true,bridge_task_created:false}
+          : request.action==='context.summarize'
           ? {status:'completed',summary:'A brief summary.'}
           : request.action==='enterprise.pi.run'
             ? {status:'completed',result:'MOCK_ENTERPRISE_OK'}
@@ -25,10 +42,12 @@ globalThis.chrome={
             : {received:true,forwarded:false}};}
   },
   storage:{local:{
-    async get(){return {trustedSites:stored,enterpriseAiSites:aiSitesStored,nativeHost:selectedNativeHost};},
+    async get(){return {trustedSites:stored,enterpriseAiSites:aiSitesStored,localToolSites:localToolSitesStored,localAgentSites:agentSitesStored,nativeHost:selectedNativeHost};},
     async set(x){
       if ('trustedSites' in x) stored=x.trustedSites;
       if ('enterpriseAiSites' in x) aiSitesStored=x.enterpriseAiSites;
+      if ('localToolSites' in x) localToolSitesStored=x.localToolSites;
+      if ('localAgentSites' in x) agentSitesStored=x.localAgentSites;
       if ('nativeHost' in x) selectedNativeHost=x.nativeHost;
     }
   }},
@@ -177,4 +196,81 @@ test('enterprise Pi requires separate local AI grant, original signed ticket and
   assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:false},popup)).ok,true);
   assert.equal((await send({type:'GET_SITE',origin:site},popup)).ai_enabled,false);
   assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,'site_not_allowed');
+});
+
+test('V2 MCP status requires separate exact-site permission and native version 2',async()=>{
+  nativePermission=true;
+  const req={channel:'local-tool-bridge:web:v2',type:'REQUEST',version:2,
+    requestId:'web_v2_1',action:'mcp.status',params:{provider:'wechat',tool:'wechat_status'}};
+  assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup)).ok,true);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,
+    'site_mcp_permission_required');
+  assert.equal((await send({type:'SITE_TOOLS_TOGGLE',origin:site,enabled:true},trustedPage)).code,
+    'caller_not_allowed');
+  assert.equal((await send({type:'SITE_TOOLS_TOGGLE',origin:site,enabled:true},popup)).ok,true);
+  assert.equal((await send({type:'GET_SITE',origin:site},popup)).tools_enabled,true);
+  const response=await send({type:'WEB_REQUEST',request:req},trustedPage);
+  assert.equal(response.ok,true);
+  assert.equal(response.result.provider,'wechat');
+  assert.equal(nativeMessages.at(-1).request.protocol_version,2);
+  assert.equal(nativeMessages.at(-1).request.action,'web.v2.mcp.status');
+  assert.equal(nativeMessages.at(-1).request.payload.origin,site);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},untrustedPage)).code,'site_not_allowed');
+  assert.equal((await send({type:'WEB_REQUEST',request:req},{...trustedPage,frameId:1})).code,
+    'site_not_allowed');
+  const unsafe={...req,requestId:'web_v2_2',params:{provider:'wechat',tool:'wechat_send_message'}};
+  assert.equal((await send({type:'WEB_REQUEST',request:unsafe},trustedPage)).code,
+    'unsupported_v2_action');
+  assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:false},popup)).ok,true);
+  assert.equal((await send({type:'GET_SITE',origin:site},popup)).tools_enabled,false);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,'site_not_allowed');
+});
+
+test('Web WorkBuddy accepts once and returns multiple cursor events, with separate grant',async()=>{
+  const req={channel:'local-tool-bridge:web:v2',type:'REQUEST',version:2,
+    requestId:'workbuddy_start',action:'agent.start',
+    params:{provider:'workbuddy',client_key:'client-1',prompt:'Fictional task'}};
+  nativePermission=true;
+  assert.equal((await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup)).ok,true);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},trustedPage)).code,
+    'site_agent_permission_required');
+  assert.equal((await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},trustedPage)).code,
+    'caller_not_allowed');
+  assert.equal((await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},popup)).ok,true);
+  const discovery={...req,requestId:'workbuddy_caps',action:'local.capabilities',params:{}};
+  const capabilities=await send({type:'WEB_REQUEST',request:discovery},trustedPage);
+  assert.equal(capabilities.ok,true);
+  assert.equal(capabilities.result.origin,site);
+  const accepted=await send({type:'WEB_REQUEST',request:req},trustedPage);
+  assert.equal(accepted.result.status,'accepted');
+  assert.equal(nativeMessages.at(-1).request.payload.origin,site);
+  assert.equal(nativeMessages.at(-1).request.action,'web.v2.agent.start');
+  assert.equal((await send({type:'WEB_REQUEST',request:req},untrustedPage)).code,'site_not_allowed');
+  const poll={...req,requestId:'workbuddy_poll1',action:'agent.poll',
+    params:{task_id:'wb-abcde-1234-0',cursor:0}};
+  const first=await send({type:'WEB_REQUEST',request:poll},trustedPage);
+  assert.equal(first.result.status,'running');
+  assert.deepEqual(first.result.events.map(x=>x.seq),[1,2]);
+  const final=await send({type:'WEB_REQUEST',request:{...poll,requestId:'workbuddy_poll2',
+    params:{task_id:'wb-abcde-1234-0',cursor:2}}},trustedPage);
+  assert.equal(final.result.status,'completed');
+  assert.deepEqual(final.result.events.map(x=>x.seq),[3]);
+  assert.equal((await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:false},popup)).ok,true);
+  assert.equal((await send({type:'WEB_REQUEST',request:poll},trustedPage)).code,
+    'site_agent_permission_required');
+});
+
+test('Chrome issues one bootstrap credential without relaying task messages',async()=>{
+  nativePermission=true;
+  await send({type:'SITE_TOGGLE',origin:site,enabled:true},popup);
+  await send({type:'SITE_AGENT_TOGGLE',origin:site,enabled:true},popup);
+  const req={channel:'local-tool-bridge:web:v2',version:2,type:'REQUEST',
+    requestId:'session-1',action:'local.connect',params:{}};
+  const received=await send({type:'WEB_REQUEST',request:req},trustedPage);
+  assert.equal(received.ok,true);
+  assert.equal(received.result.endpoint,'http://127.0.0.1:48293');
+  assert.equal(received.result.token.length,64);
+  assert.equal(nativeMessages.at(-1).request.action,'web.v2.session.issue');
+  assert.equal(nativeMessages.at(-1).request.payload.origin,site);
+  assert.equal((await send({type:'WEB_REQUEST',request:req},untrustedPage)).code,'site_not_allowed');
 });

@@ -118,3 +118,72 @@ export function validWebRequest(message) {
       (message.params && typeof message.params === 'object' && !Array.isArray(message.params) &&
        Object.keys(message.params).length === 0));
 }
+
+/** V2: status-only local MCP, separately authorized per site and OS user.
+ *  This cannot be converted into generic MCP tools/call or Agent shell access.
+ */
+export const WEB_V2_CHANNEL = 'local-tool-bridge:web:v2';
+export function validWebV2Request(message) {
+  if (!message || typeof message !== 'object' || Array.isArray(message) ||
+      message.channel !== WEB_V2_CHANNEL || message.type !== 'REQUEST' ||
+      message.version !== 2 || !validRequestId(message.requestId) ||
+      !Object.keys(message).every(k => ['channel', 'type', 'version', 'requestId', 'action', 'params'].includes(k)))
+    return false;
+  const p = message.params;
+  if (message.action === 'local.capabilities' || message.action === 'local.connect') {
+    return p === undefined ||
+      (p && typeof p === 'object' && !Array.isArray(p) && Object.keys(p).length === 0);
+  }
+  if (message.action === 'mcp.status') {
+    return p && typeof p === 'object' && !Array.isArray(p) &&
+      Object.keys(p).length === 2 && typeof p.provider === 'string' &&
+      typeof p.tool === 'string' &&
+      /^[a-zA-Z0-9._-]{1,64}$/.test(p.provider) &&
+      /^(?:status|[a-zA-Z0-9._-]{1,56}_status)$/.test(p.tool);
+  }
+  if (message.action === 'agent.start') {
+    return p && typeof p === 'object' && !Array.isArray(p) &&
+      Object.keys(p).length === 3 && p.provider === 'workbuddy' &&
+      typeof p.client_key === 'string' && /^[A-Za-z0-9_.-]{1,80}$/.test(p.client_key) &&
+      typeof p.prompt === 'string' && p.prompt.trim().length > 0 &&
+      new TextEncoder().encode(p.prompt).length <= 12000;
+  }
+  if (message.action === 'agent.poll') {
+    return p && typeof p === 'object' && !Array.isArray(p) &&
+      Object.keys(p).length === 2 &&
+      typeof p.task_id === 'string' && /^wb-[a-f0-9-]{1,92}$/.test(p.task_id) &&
+      Number.isSafeInteger(p.cursor) && p.cursor >= 0 && p.cursor <= 100000;
+  }
+  return false;
+}
+export function nativeV2Request(action, payload, id) {
+  if (!validRequestId(id) || !['web.v2.capabilities','web.v2.mcp.status','web.v2.agent.start','web.v2.agent.poll','web.v2.session.issue'].includes(action) ||
+      !payload || typeof payload !== 'object' || Array.isArray(payload))
+    throw new Error('Invalid V2 request');
+  if (!validatedOrigin(payload.origin + '/')) throw new Error('Invalid V2 origin');
+  if (['web.v2.capabilities','web.v2.session.issue'].includes(action) &&
+      Object.keys(payload).length !== 1)
+    throw new Error('V2 status payload must be origin only');
+  if (action === 'web.v2.mcp.status' && !validWebV2Request({
+    channel:WEB_V2_CHANNEL,type:'REQUEST',version:2,requestId:id,
+    action:'mcp.status',params:{provider:payload.provider,tool:payload.tool}
+  })) throw new Error('Unsupported V2 MCP request');
+  const v2Agent = action === 'web.v2.agent.start' ? 'agent.start'
+    : action === 'web.v2.agent.poll' ? 'agent.poll' : null;
+  if (v2Agent && (!validWebV2Request({
+    channel:WEB_V2_CHANNEL,type:'REQUEST',version:2,requestId:id,
+    action:v2Agent,params:v2Agent === 'agent.start'
+      ? {provider:payload.provider,client_key:payload.client_key,prompt:payload.prompt}
+      : {task_id:payload.task_id,cursor:payload.cursor}
+  }) || Object.keys(payload).length !== (v2Agent === 'agent.start' ? 4 : 3))) {
+    throw new Error('Unsupported V2 Agent request');
+  }
+  return {protocol_version:2,request_id:id,action,payload};
+}
+export function parseNativeV2Response(message, id) {
+  if (!message || typeof message !== 'object' || Array.isArray(message) ||
+      message.protocol_version !== 2 || message.request_id !== id ||
+      typeof message.ok !== 'boolean') throw new Error('Invalid native V2 result');
+  if (!message.ok) return {ok:false, code:String(message.error || 'local_provider_refused').slice(0,100)};
+  return {ok:true,result:message.result || {}};
+}
