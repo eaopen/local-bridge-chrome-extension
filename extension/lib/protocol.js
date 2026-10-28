@@ -142,17 +142,29 @@ export function validWebV2Request(message) {
       /^(?:status|[a-zA-Z0-9._-]{1,56}_status)$/.test(p.tool);
   }
   if (message.action === 'agent.run') {
-    return p && typeof p === 'object' && !Array.isArray(p) &&
-      Object.keys(p).length === 7 &&
-      p.api_version === 2 &&
+    // Keep omitted options omitted: Bridge uses the OS-user AgentPreferences.
+    const keys = p && typeof p === 'object' && !Array.isArray(p)
+      ? Object.keys(p) : [];
+    const required = ['api_version','client_key','prompt'];
+    const optional = ['agent','model','think_mode','agent_mode'];
+    if (keys.length < 3 || keys.length > 7 ||
+        !required.every(key => Object.hasOwn(p,key)) ||
+        !keys.every(key => required.includes(key) || optional.includes(key)))
+      return false;
+    return p.api_version === 2 &&
       /^[A-Za-z0-9_.-]{1,80}$/.test(p.client_key || '') &&
       typeof p.prompt === 'string' && Boolean(p.prompt.trim()) &&
       new TextEncoder().encode(p.prompt).length <= 12000 &&
-      ['auto','workbuddy','codex','pi'].includes(p.agent) &&
-      typeof p.model === 'string' && /^[A-Za-z0-9_./:-]{1,128}$/.test(p.model) &&
-      !p.model.includes('://') && !p.model.startsWith('/') &&
-      ['auto','off','low','medium','high','xhigh','max'].includes(p.think_mode) &&
-      ['prefer','require'].includes(p.agent_mode) &&
+      (!Object.hasOwn(p,'agent') ||
+        ['auto','workbuddy','codex','pi'].includes(p.agent)) &&
+      (!Object.hasOwn(p,'model') ||
+        (typeof p.model === 'string' && /^[A-Za-z0-9_./:-]{1,128}$/.test(p.model) &&
+         !p.model.includes('://') && !p.model.startsWith('/') &&
+         !p.model.includes('..'))) &&
+      (!Object.hasOwn(p,'think_mode') ||
+        ['auto','off','low','medium','high','xhigh','max'].includes(p.think_mode)) &&
+      (!Object.hasOwn(p,'agent_mode') ||
+        ['prefer','require'].includes(p.agent_mode)) &&
       !(p.agent === 'auto' && p.agent_mode === 'require');
   }
   if (message.action === 'agent.read') {
@@ -177,15 +189,13 @@ export function nativeV2Request(action, payload, id) {
   })) throw new Error('Unsupported V2 MCP request');
   const v2Agent = action === 'web.v2.agent.run' ? 'agent.run'
     : action === 'web.v2.agent.read' ? 'agent.read' : null;
-  if (v2Agent && (!validWebV2Request({
-    channel:WEB_V2_CHANNEL,type:'REQUEST',version:2,requestId:id,
-    action:v2Agent,params:v2Agent === 'agent.run'
-      ? {api_version:payload.api_version,client_key:payload.client_key,prompt:payload.prompt,
-         agent:payload.agent,model:payload.model,
-         think_mode:payload.think_mode,agent_mode:payload.agent_mode}
-      : {task_id:payload.task_id,cursor:payload.cursor}
-  }) || Object.keys(payload).length !== (v2Agent === 'agent.run' ? 8 : 3))) {
-    throw new Error('Unsupported V2 Agent request');
+  if (v2Agent) {
+    // Preserve exact optional keys for Native fallback.
+    const {origin:_origin, ...params} = payload;
+    if (!validWebV2Request({
+      channel:WEB_V2_CHANNEL,type:'REQUEST',version:2,requestId:id,
+      action:v2Agent,params
+    })) throw new Error('Unsupported V2 Agent request');
   }
   return {protocol_version:2,request_id:id,action,payload};
 }

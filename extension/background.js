@@ -162,8 +162,7 @@ async function onMessage(message, sender) {
         const payload = ['web.v2.capabilities','web.v2.session.issue'].includes(action) ? {origin}
           : action === 'web.v2.mcp.status' ? {origin,provider:p.provider,tool:p.tool}
           : action === 'web.v2.agent.run'
-            ? {origin,api_version:p.api_version,client_key:p.client_key,prompt:p.prompt,
-              agent:p.agent,model:p.model,think_mode:p.think_mode,agent_mode:p.agent_mode}
+            ? {origin,...p} // validated payload; optional Agent selectors remain optional
             : {origin,task_id:p.task_id,cursor:p.cursor};
         return sendNativeV2(action, payload);
       } finally { localToolActive.delete(key); }
