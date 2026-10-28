@@ -112,3 +112,26 @@ test('unified agent.run options are bounded, never arbitrary shell or model URLs
   assert.throws(()=>nativeV2Request('web.v2.agent.run',
     {origin:'https://app.example.test',...valid,command:'rm'},'unified-1'))
 })
+
+test('missing optional Agent selectors survive Native fallback without invented auto',()=>{
+  const minimal={api_version:2,client_key:'same-key-123',
+    prompt:'A harmless sample prompt'};
+  const message={...base,requestId:'missing-options-1',
+    action:'agent.run',params:minimal};
+  assert.equal(validWebV2Request(message),true);
+  const native=nativeV2Request('web.v2.agent.run',
+    {origin:'https://app.example.test',...minimal},'missing-options-1');
+  assert.deepEqual(native.payload,{origin:'https://app.example.test',...minimal});
+  assert.equal(native.payload.agent,undefined);
+  for(const bad of [
+    {...minimal,model:null},
+    {...minimal,think_mode:'infinite'},
+    {...minimal,agent_mode:'system'},
+    {...minimal,tools:['read']},
+    {...minimal,origin:'https://evil.example'}
+  ]) assert.equal(validWebV2Request({...message,params:bad}),false);
+  assert.throws(()=>nativeV2Request('web.v2.agent.run',
+    {origin:'https://app.example.test',...minimal,shell:'run'},'missing-options-1'));
+  assert.equal(validWebV2Request({...message,params:{...minimal,
+    agent:'auto',model:'auto',think_mode:'auto',agent_mode:'prefer'}}),true);
+});
